@@ -1,0 +1,169 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import useGameStore from "@/hooks/useGameStore"
+import TwitterIcon from "./ui/TwitterIcon"
+import TelegramIcon from "./ui/TelegramIcon"
+
+interface MinimalGameUIProps {
+  gameStarted: boolean
+  onStart: () => void
+  onReset: () => void
+  hasInteracted: boolean
+}
+
+export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: MinimalGameUIProps) {
+  const [showControls, setShowControls] = useState(false)
+  const { isDebugMode, toggleDebugMode, currentWave, waveStatus, zombiesRemainingInWave } = useGameStore()
+
+  const [waveMessage, setWaveMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!gameStarted) {
+      setWaveMessage(null);
+      return;
+    }
+
+    let message: string | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    if (waveStatus === 'Spawning') {
+      message = `WAVE ${currentWave} STARTING`;
+    } else if (waveStatus === 'BetweenWaves') {
+      message = `WAVE ${currentWave} CLEARED!`;
+    }
+
+    if (message) {
+      setWaveMessage(message);
+      timeoutId = setTimeout(() => {
+        setWaveMessage(null);
+      }, 3000);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [waveStatus, currentWave, gameStarted]);
+
+  const handleCopy = () => {
+    const contractAddress = "YOUR_PLACEHOLDER_SOLANA_ADDRESS";
+    navigator.clipboard.writeText(contractAddress).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+  };
+
+  return (
+    <div className="absolute inset-0 pointer-events-none text-white font-pixel">
+      <div className="absolute top-4 right-4 pointer-events-auto z-10">
+        <button
+          onClick={toggleDebugMode}
+          className="px-3 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+        >
+          Toggle Debug ({isDebugMode ? "On" : "Off"})
+        </button>
+      </div>
+
+      {gameStarted && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-center">
+              {waveMessage && (
+                  <div className="text-3xl text-red-500 mb-2 animate-pulse">
+                      {waveMessage}
+                  </div>
+              )}
+               {waveStatus === 'Active' && (
+                  <div className="text-xl text-yellow-400">
+                      WAVE {currentWave} - REMAINING: {zombiesRemainingInWave}
+                  </div>
+              )}
+              {waveStatus === 'BetweenWaves' && (
+                 <div className="text-xl text-green-400">
+                      NEXT WAVE STARTING SOON...
+                 </div>
+              )}
+          </div>
+      )}
+
+      {!gameStarted && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-auto">
+          <h1 className="text-4xl font-pixel text-red-500 mb-6">Jeet Zombies</h1>
+          <Button
+            onClick={onStart}
+            className="bg-red-600 hover:bg-red-700 text-white font-pixel px-8 py-4 text-xl"
+            disabled={!hasInteracted}
+          >
+            {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
+          </Button>
+
+          <div className="mt-4">
+            <button
+              onClick={() => setShowControls(!showControls)}
+              className="text-red-400 hover:text-red-300 font-pixel underline"
+            >
+              {showControls ? "Hide Controls" : "Show Controls"}
+            </button>
+          </div>
+
+          {showControls && (
+            <div className="mt-4 bg-black/80 p-4 rounded text-left">
+              <h2 className="text-red-500 font-pixel mb-2">CONTROLS:</h2>
+              <ul className="text-red-300 font-pixel-alt space-y-1">
+                <li>WASD - Move</li>
+                <li>MOUSE - Look around</li>
+                <li>LEFT CLICK - Shoot</li>
+                <li>R - Reload</li>
+                <li>1-3 - Switch weapons</li>
+                <li>SPACE - Jump</li>
+                <li>SHIFT - Sprint</li>
+              </ul>
+            </div>
+          )}
+
+          {/* Social Links Section - Moved back below controls */}
+          <div className="flex flex-col items-center space-y-2 mt-6 pointer-events-auto px-4 w-full">
+            <div className="flex space-x-4">
+              {/* Twitter Link */}
+              <a 
+                href="https://x.com/JeetZombies" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-blue-400 hover:text-blue-300"
+                aria-label="Twitter"
+              >
+                <TwitterIcon className="w-6 h-6" />
+              </a>
+              {/* Telegram Link */}
+              <a 
+                href="https://t.me/JeetZombies" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-blue-400 hover:text-blue-300"
+                aria-label="Telegram"
+              >
+                <TelegramIcon className="w-6 h-6" />
+              </a>
+            </div>
+            {/* Added back Exclusively on GFM text */}
+            <p className="text-white font-pixel-alt text-base">Exclusively on GFM</p> 
+            {/* CA Display and Copy Button */}
+            <div className="flex items-center space-x-2 mt-1"> 
+              <span className="text-gray-400 font-mono text-xs break-all">
+                YOUR_PLACEHOLDER_SOLANA_ADDRESS 
+              </span>
+              <Button
+                onClick={handleCopy}
+                className="bg-red-600 hover:bg-red-700 text-white font-pixel-alt text-sm px-3 py-1 flex-shrink-0"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
