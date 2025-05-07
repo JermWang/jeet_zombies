@@ -58,38 +58,50 @@ export default function EnhancedLighting() {
       {/* Ambient light for overall scene brightness */}
       <ambientLight ref={ambientLightRef} intensity={0.3} />
 
-      {/* Point lights for atmosphere */}
+      {/* Point lights for atmosphere - REMOVING castShadow and fixing ref typing */}
       <pointLight
-        ref={(el) => el && pointLightsRef.current.push(el)}
+        ref={(el) => { 
+          if (el && !pointLightsRef.current.includes(el)) { // Prevent duplicates if re-rendered
+            pointLightsRef.current.push(el);
+          } 
+        }}
         position={[10, 5, 10]}
         intensity={1}
         distance={20}
         decay={2}
-        castShadow
       />
       <pointLight
-        ref={(el) => el && pointLightsRef.current.push(el)}
+        ref={(el) => { 
+          if (el && !pointLightsRef.current.includes(el)) {
+            pointLightsRef.current.push(el);
+          }
+        }}
         position={[-10, 5, -10]}
         intensity={1}
         distance={20}
         decay={2}
-        castShadow
       />
       <pointLight
-        ref={(el) => el && pointLightsRef.current.push(el)}
+        ref={(el) => { 
+          if (el && !pointLightsRef.current.includes(el)) {
+            pointLightsRef.current.push(el);
+          }
+        }}
         position={[10, 5, -10]}
         intensity={1}
         distance={20}
         decay={2}
-        castShadow
       />
       <pointLight
-        ref={(el) => el && pointLightsRef.current.push(el)}
+        ref={(el) => { 
+          if (el && !pointLightsRef.current.includes(el)) {
+            pointLightsRef.current.push(el);
+          }
+        }}
         position={[-10, 5, 10]}
         intensity={1}
         distance={20}
         decay={2}
-        castShadow
       />
 
       {/* Hemisphere light for natural sky/ground reflection */}

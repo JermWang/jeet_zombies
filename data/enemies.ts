@@ -12,6 +12,12 @@ export interface EnemyConfig {
   attackRange: number;
   attackDamage?: number; // Optional: Damage dealt by this enemy type
   modelPath?: string; // Optional GLTF path for specific types (like boss)
+  attackDistanceThreshold?: number; // ADDED
+  animation?: {                 // ADDED
+    walkSpeed?: number;
+    swingAmplitude?: number;
+    bodyBobAmplitude?: number;
+  };
 }
 
 // Centralized configuration for different enemy types
@@ -26,6 +32,12 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     speed: 2.0, 
     attackRange: 1.5,
     attackDamage: 10,
+    attackDistanceThreshold: 1.8, // ADDED example value
+    animation: {                  // ADDED example values
+        walkSpeed: 3.0,
+        swingAmplitude: 0.2,
+        bodyBobAmplitude: 0.05,
+    },
   },
   zombie_brute: {
     health: 250,

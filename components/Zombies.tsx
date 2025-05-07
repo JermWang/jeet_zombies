@@ -11,6 +11,9 @@ import { getEnemyConfig } from '@/data/enemies';
 import { Vector3 as RapierVector3 } from '@dimforge/rapier3d-compat';
 import { shallow } from 'zustand/shallow';
 
+// NEW: Import useSoundEffects hook
+import { useSoundEffects } from "@/hooks/useSoundEffects";
+
 // --- Import Collision Groups ---
 import { 
     GROUP_ENVIRONMENT, 
@@ -26,6 +29,10 @@ const ATTACK_DISTANCE_THRESHOLD = 1.8; // Might be overridden by config
 const MAX_ZOMBIES_VISUAL = 50; // Match the pool size for visual instances
 const ZOMBIE_SCALE = 1.0; // Might need adjustment for native geometry
 const INITIAL_SPAWN_RADIUS = 10; // Radius for initial scattering
+
+// --- Attack Constants (NEW) ---
+const DEFAULT_ATTACK_DAMAGE = 10;
+const DEFAULT_ATTACK_COOLDOWN = 2; // seconds
 
 // Zombie hitbox collision group config
 const enemyHitboxCollisions = interactionGroups(
@@ -47,20 +54,21 @@ interface ActiveZombieProps {
     type: string;
     initialPosition: THREE.Vector3; // Use a specific prop for initial position
     isHit: boolean | undefined;
-    playerPosition: THREE.Vector3;
+    playerPosition: THREE.Vector3; // Changed from nullable
     rapier: ReturnType<typeof useRapier>;
 }
 
 // --- UPDATED ActiveZombie Component ---
-function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier }: ActiveZombieProps) {
+const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier }: ActiveZombieProps) {
     // Render Guard - Use props now
     if (id === 0 || type === 'zombie_boss') {
-        console.log(`%c[ActiveZombie Render Guard] ID ${id} (${type}) is boss type. Returning null immediately.`, "color: orange; font-weight: bold");
+        // console.log(`%c[ActiveZombie Render Guard] ID ${id} (${type}) is boss type. Returning null immediately.`, "color: orange; font-weight: bold");
         return null;
     }
 
     const groupRef = useRef<THREE.Group>(null);
     const bodyRef = useRef<RapierRigidBody | null>(null);
+    const lastAttackTimeRef = useRef(0); // NEW: For attack cooldown
     const leftLegRef = useRef<THREE.Object3D>(null);
     const rightLegRef = useRef<THREE.Object3D>(null);
     const leftArmRef = useRef<THREE.Object3D>(null);
@@ -69,24 +77,32 @@ function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier
     // Config memoization - Use type prop
     const config = useMemo(() => getEnemyConfig(type), [type]);
 
+    // NEW: Get decreaseHealth from game store
+    const decreaseHealth = useGameStore((state) => state.decreaseHealth);
+    // NEW: Get playZombieBiteSound from sound effects hook
+    const playZombieBiteSound = useSoundEffects((state) => state.playZombieBiteSound);
+
     // --- Effect to Create Rapier Body ---
     useEffect(() => {
-        // Use props: id, type, initialPosition, config
-        if (!rapier || !rapier.world || id === null || !config) return;
-
-        if (type === 'zombie_boss') {
-             console.warn(`[ActiveZombie Create Effect] Attempted to create body for zombie_boss (ID: ${id}). Skipping.`);
-             return;
+        console.log(`%c[ActiveZombie Physics Effect RUN] ID: ${id}, Type: ${type}. bodyRef.current is initially: ${bodyRef.current ? 'SET' : 'NULL'}`, "color: yellow");
+        
+        if (!rapier || !rapier.world || id === null || !config) {
+            console.log(`%c[ActiveZombie Physics Effect] ID: ${id} - Conditions (rapier, id, config) not met. Aborting effect.`, "color: orange");
+            return;
         }
-        if (bodyRef.current) {
-             // console.log(`[ActiveZombie Create Effect] Body ref already exists for ID ${id}. Skipping creation.`);
-             return;
+        // This zombie_boss check is redundant if filtered out by parent, but good as a safeguard
+        if (type === 'zombie_boss') { 
+            console.log(`%c[ActiveZombie Physics Effect] ID: ${id} is zombie_boss type. Aborting effect.`, "color: orange");
+            return;
         }
 
-        console.log(`[ActiveZombie Create Effect] Creating Rapier body for Enemy ID ${id}, Type: ${type}`);
-        // Use initialPosition prop directly
+        if (bodyRef.current) { // If body already exists for this instance
+            console.log(`%c[ActiveZombie Physics Effect] ID: ${id} - Body already exists (ref is SET). SKIPPING body creation.`, "color: green");
+            return; 
+        }
+        
+        console.log(`%c[ActiveZombie Physics Effect] ID: ${id} - Creating NEW Rapier body.`, "color: cyan");
         const spawnPos = initialPosition;
-        console.log(`[ActiveZombie Create Effect] Using position: { x: ${spawnPos.x.toFixed(2)}, y: ${spawnPos.y.toFixed(2)}, z: ${spawnPos.z.toFixed(2)} }`);
 
         const rigidBodyDesc = rapier.rapier.RigidBodyDesc.dynamic()
             .setTranslation(spawnPos.x, spawnPos.y, spawnPos.z)
@@ -109,29 +125,27 @@ function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier
             .setCollisionGroups(enemyHitboxCollisions);
         rapier.world.createCollider(colliderDesc, rapierBody);
 
-        console.log(`[ActiveZombie Create Effect] Created Rapier body for Enemy ID ${id}. Stored in local ref.`);
-
-        // --- Cleanup Function ---
         return () => {
             const bodyToRemove = bodyRef.current;
-            console.log(`[ActiveZombie Cleanup] Running for ID: ${id}, Body Ref: ${bodyToRemove ? 'Exists' : 'null'}`);
+            console.log(`%c[ActiveZombie Physics CLEANUP START] ID: ${id}. bodyRef was ${bodyToRemove ? 'SET' : 'NULL'}.`, "color: red");
             if (bodyToRemove && rapier.world) {
                 try {
                     rapier.world.removeRigidBody(bodyToRemove);
-                    console.log(`[ActiveZombie Cleanup] Successfully removed RB for Enemy ID ${id} using body ref.`);
+                    console.log(`%c[ActiveZombie Physics CLEANUP] Successfully removed RB for Enemy ID ${id}.`, "color: red");
                 } catch (error) {
-                    console.error(`[ActiveZombie Cleanup] Error removing RB for Enemy ID ${id}:`, error);
+                    console.error(`[ActiveZombie Physics CLEANUP] Error removing RB for Enemy ID ${id}:`, error);
                 }
             }
-            bodyRef.current = null;
+            bodyRef.current = null; // Explicitly nullify on cleanup
+            console.log(`%c[ActiveZombie Physics CLEANUP END] ID: ${id}. bodyRef is now NULL.`, "color: red");
         };
-    // Update dependencies to use props
-    }, [rapier, id, type, initialPosition, config]);
+    }, [id, type, config]); // DIAGNOSTIC STATE: Temporarily remove rapier from deps - User indicates this is preferred for stability
 
     // --- Re-enable useFrame Hook ---
     useFrame((state, delta) => {
         // ---- RE-ENABLE PHYSICS SYNC & LOGIC ----
         const rapierBodyApi = bodyRef.current;
+        
         // NOTE: We need to fetch `isDead` state separately if needed inside useFrame
         //       For now, we assume the parent `Zombies` component handles unmounting dead ones.
         if (!groupRef.current || !playerPosition || !config || !rapierBodyApi) {
@@ -139,29 +153,38 @@ function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier
         }
 
         // --- Get Current Position Directly from Rapier Dynamic Body ---
-        const currentPositionVec = rapierBodyApi.translation(); // Get THREE.Vector3 directly
-        groupRef.current.position.copy(currentPositionVec);
+        const currentPositionVec = rapierBodyApi.translation(); // This is a Rapier Vector3 like {x,y,z}
+        groupRef.current.position.copy(currentPositionVec as unknown as THREE.Vector3); // Copy to THREE.Vector3 for group
         groupRef.current.position.y += config.visualYOffset; // Apply visual offset AFTER getting physics position
 
         // --- Rotation/Look At --- 
         const lookAtPos = new THREE.Vector3(playerPosition.x, currentPositionVec.y + config.visualYOffset, playerPosition.z); // Look at player on the same Y plane, adjust for visual offset
         groupRef.current.lookAt(lookAtPos);
 
-        // --- Movement Logic --- 
-        const currentPositionTHREE = new THREE.Vector3(currentPositionVec.x, currentPositionVec.y, currentPositionVec.z); // Convert Rapier Vector to THREE.Vector3
+        // --- Movement & Attack Logic --- 
+        const currentPositionTHREE = new THREE.Vector3(currentPositionVec.x, currentPositionVec.y, currentPositionVec.z);
         const distanceToPlayer = currentPositionTHREE.distanceTo(playerPosition);
 
-        // Decide if moving or attacking (Simplified for now)
-        let desiredVelocity = new THREE.Vector3(0, 0, 0); 
-        if (distanceToPlayer > ATTACK_DISTANCE_THRESHOLD) {
+        let desiredVelocity = new THREE.Vector3(0, 0, 0);
+        const zombieSpeed = config.speed || ZOMBIE_SPEED; // Use config speed, fallback to constant
+        const attackRange = config.attackRange || ATTACK_DISTANCE_THRESHOLD; // Use config attack range
+
+        if (distanceToPlayer > attackRange) {
              // Move towards player
-            const direction = new THREE.Vector3().subVectors(playerPosition, currentPositionTHREE).normalize(); // Use THREE.Vector3 for subtraction
-            desiredVelocity.set(direction.x, 0, direction.z).multiplyScalar(config.speed || ZOMBIE_SPEED);
-             // TODO: Implement pathfinding or obstacle avoidance if needed
+            const direction = new THREE.Vector3().subVectors(playerPosition, currentPositionTHREE).normalize();
+            desiredVelocity.set(direction.x, 0, direction.z).multiplyScalar(zombieSpeed);
          } else {
-            // Close enough to attack (or stop)
-            // TODO: Implement attack logic/animation trigger
-            desiredVelocity.set(0, 0, 0);
+            // Close enough to attack
+            desiredVelocity.set(0, 0, 0); // Stop moving when in attack range (or play attack animation)
+            
+            const currentTime = state.clock.elapsedTime;
+            if (currentTime - lastAttackTimeRef.current > DEFAULT_ATTACK_COOLDOWN) {
+                console.log(`%c[ActiveZombie ATTACK] ID: ${id} attacking player! Distance: ${distanceToPlayer.toFixed(2)}, Range: ${attackRange}`, "color: red; font-weight: bold;");
+                decreaseHealth(DEFAULT_ATTACK_DAMAGE);
+                playZombieBiteSound(); // NEW: Play bite sound
+                lastAttackTimeRef.current = currentTime;
+                // TODO: Trigger attack animation via state or direct action call if model supports it
+            }
         }
 
         // Apply linear velocity (respecting gravity which Rapier handles)
@@ -171,28 +194,36 @@ function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier
         if (type === 'zombie_standard_shirt') {
             const walkSpeed = 3.0;
             const swingAmplitude = 0.2;
-            const bodyBobAmplitude = 0.05;
+            // const bodyBobAmplitude = 0.05; // Body bobbing, can be added back if desired
             const time = state.clock.elapsedTime;
             const currentVelocity = rapierBodyApi.linvel();
             const speedMagnitude = Math.sqrt(currentVelocity.x ** 2 + currentVelocity.z ** 2);
             const isMoving = speedMagnitude > 0.1; // Threshold to consider moving
 
-            // Calculate phase based on speed and time
+            // Calculate phase based on speed and time - still needed for legs
             const phase = time * walkSpeed * (isMoving ? 1 : 0);
 
-            // Apply limb swing and body bob only when moving
+            // --- New Zombie Arm Pose ---
+            const ZOMBIE_ARM_OUTSTRETCH_ANGLE = -Math.PI / 2.8; // Arms forward and slightly up (approx -64 degrees)
+
+            if (leftArmRef.current) {
+                leftArmRef.current.rotation.x = ZOMBIE_ARM_OUTSTRETCH_ANGLE;
+            }
+            if (rightArmRef.current) {
+                rightArmRef.current.rotation.x = ZOMBIE_ARM_OUTSTRETCH_ANGLE;
+                // Future idea: Add slight asymmetry to arms if desired:
+                // rightArmRef.current.rotation.x = ZOMBIE_ARM_OUTSTRETCH_ANGLE * 0.95;
+                // rightArmRef.current.rotation.z = Math.PI / 32;
+            }
+
+            // --- Leg Animation (remains the same) ---
             if (isMoving) {
                 if (leftLegRef.current) leftLegRef.current.rotation.x = Math.sin(phase) * swingAmplitude;
                 if (rightLegRef.current) rightLegRef.current.rotation.x = Math.sin(phase + Math.PI) * swingAmplitude;
-                if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(phase + Math.PI) * swingAmplitude;
-                if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(phase) * swingAmplitude;
-                if (groupRef.current) groupRef.current.position.y += Math.sin(phase * 2) * bodyBobAmplitude; // Bobbing
             } else {
-                // Reset to default pose when idle
+                // Reset leg pose when idle
                 if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
                 if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
-                if (leftArmRef.current) leftArmRef.current.rotation.x = 0;
-                if (rightArmRef.current) rightArmRef.current.rotation.x = 0;
             }
         } else if (type === 'zombie_brute') {
             // TODO: Add procedural animation for brute if needed
@@ -216,48 +247,68 @@ function ActiveZombie({ id, type, initialPosition, isHit, playerPosition, rapier
             />
         </group>
     );
-}
+});
 
 // --- UPDATED Main Zombies Manager Component ---
 const Zombies = () => {
-    // Select ONLY the necessary primitive data for active, non-boss enemies
-    const enemiesToRenderData = useGameStore(
-        (state) => Object.values(state.enemies)
+    const enemiesFromStore = useGameStore((state) => state.enemies, shallow);
+    
+    // Select playerPosition vector values to stabilize the object reference passed as prop
+    // Ensure playerPosition is not null before passing to ActiveZombie
+    const playerPosition = useGameStore((state) => state.playerPosition);
+
+    const playerPositionProp = useMemo(() => {
+        return playerPosition ? new THREE.Vector3(playerPosition.x, playerPosition.y, playerPosition.z) : null;
+    }, [playerPosition]);
+    
+    const rapierContextValue = useRapier(); // Get the context value
+
+    // Log if rapierContextValue reference changes
+    const rapierRef = useRef(rapierContextValue);
+    useEffect(() => {
+        if (rapierRef.current !== rapierContextValue) {
+            console.warn("[Zombies Component] rapier context from useRapier() has CHANGED REFERENCE!");
+            rapierRef.current = rapierContextValue;
+        } else {
+            // console.log("[Zombies Component] rapier context from useRapier() is STABLE."); // Too noisy
+        }
+    }, [rapierContextValue]);
+
+    const enemiesToRenderData = useMemo(() => {
+        // console.log(`[Zombies Component] Memoizing enemiesToRenderData. Number of enemies from store: ${Object.keys(enemiesFromStore).length}`);
+        return Object.values(enemiesFromStore) // If enemiesFromStore is an object pool like { id: enemyState }
             .filter(enemy => !enemy.isDead && enemy.type !== 'zombie_boss')
-            .map(enemy => ({ // Map to a new object with only needed primitives
+            .map(enemy => ({
                 id: enemy.id,
                 type: enemy.type,
-                position: enemy.position, // Assuming position reference is stable initially
+                // Pass the position reference directly. ActiveZombie's effect for body creation no longer depends on it changing.
+                position: enemy.position, 
                 isHit: enemy.isHit,
-            })),
-        shallow // Keep shallow compare
-    );
-    const playerPosition = useGameStore((state) => state.playerPosition);
-    const rapier = useRapier();
+            }));
+    }, [enemiesFromStore]);
 
-    // --- Log initial state on mount --- (Keep this)
+    // Initial setup log
     useEffect(() => {
-        console.log('%c[Zombies Initial Mount] Initial enemies state:', 'color: purple; font-weight: bold', useGameStore.getState().enemies);
-    }, []);
+        // console.log("[Zombies Initial Mount] Initial enemies state:", enemies);
+    }, []); // Empty dependency array means this runs once on mount
 
-    // --- Log when this component actually re-renders --- (Keep this)
-    useEffect(() => {
-        console.log('%c[Zombies Re-render] Enemies to render count:', 'color: cyan', enemiesToRenderData.length);
-    });
+    // console.log(`[Zombies Re-render] Enemies to render count: ${enemiesToRender.length}`);
 
     return (
         <>
             {/* Map over the selected primitive data */}
             {enemiesToRenderData.map((enemyData) => (
-                <ActiveZombie
-                    key={enemyData.id} // Use id from mapped data
-                    id={enemyData.id}
-                    type={enemyData.type}
-                    initialPosition={enemyData.position} // Use position from mapped data
-                    isHit={enemyData.isHit}
-                    playerPosition={playerPosition!}
-                    rapier={rapier}
-                />
+                playerPositionProp && ( // Ensure playerPositionProp is not null
+                    <ActiveZombie
+                        key={enemyData.id} // Use id from mapped data
+                        id={enemyData.id}
+                        type={enemyData.type}
+                        initialPosition={enemyData.position} 
+                        isHit={enemyData.isHit}
+                        playerPosition={playerPositionProp} // Pass the memoized and non-null playerPositionProp
+                        rapier={rapierContextValue}
+                    />
+                )
             ))}
         </>
     );

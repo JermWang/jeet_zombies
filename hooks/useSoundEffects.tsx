@@ -22,9 +22,14 @@ interface SoundEffectsState {
   zombieDeathBuffer: Howl | null
   gameStartBuffer: Howl | null
   ambientMapNoiseBuffer: Howl | null
+  zombieAmbientBuffer: Howl | null, // New zombie ambient sound
   bulletImpactBuffer: Howl | null
   ambientMusicBuffer: Howl | null // Background music
   batBuffer: Howl | null          // Bat sound effect
+
+  // NEW: Game Over sounds
+  transitionBuffer: Howl | null
+  outtaControlVOBuffer: Howl | null
 
   // --- Add Wave VO Buffers ---
   waveClearedVOBuffer: Howl | null;
@@ -49,9 +54,14 @@ interface SoundEffectsState {
   playZombieDeathSound: () => void
   playGameStartSound: () => void
   playAmbientMapNoiseSound: () => void // Plays periodically
+  playZombieAmbientSound: () => void, // New zombie ambient sound playback
   playBulletImpactSound: (position?: { x: number; y: number; z: number }) => void // Position optional for now
   playAmbientMusic: () => void // Plays looped background music
   playBatSound: () => void // Plays bat sound effect (with cooldown)
+
+  // NEW: Game Over sound playback functions
+  playTransitionSound: () => void
+  playOuttaControlSound: () => void
 
   // --- Add Wave VO Functions ---
   playWaveClearedVO: () => void;
@@ -64,10 +74,14 @@ interface SoundEffectsState {
   // Internal state for bat sound timing
   lastBatSoundPlayTime: number
   setLastBatSoundPlayTime: (time: number) => void
+  // Internal state for zombie ambient sound timing
+  lastZombieAmbientPlayTime: number
+  setLastZombieAmbientPlayTime: (time: number) => void
 }
 
 // Configuration
 const MAP_NOISE_INTERVAL = 2 * 60 * 1000 // 2 minutes in milliseconds
+const ZOMBIE_AMBIENT_INTERVAL = 90 * 1000 // 1.5 minutes in milliseconds
 const BAT_SOUND_COOLDOWN = 7 * 60 * 1000 // 7 minutes in milliseconds (adjustable)
 
 // Create the Zustand store
@@ -88,9 +102,14 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   zombieDeathBuffer: null,
   gameStartBuffer: null,
   ambientMapNoiseBuffer: null,
+  zombieAmbientBuffer: null,
   bulletImpactBuffer: null,
   ambientMusicBuffer: null,
   batBuffer: null,
+
+  // NEW: Game Over sounds
+  transitionBuffer: null,
+  outtaControlVOBuffer: null,
 
   // --- Initialize Wave VO Buffers ---
   waveClearedVOBuffer: null,
@@ -146,9 +165,13 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
       { key: "zombieDeathBuffer", path: soundPaths.zombieDeath, volume: 0.7 },
       { key: "gameStartBuffer", path: soundPaths.gameStart, volume: 0.9 },
       { key: "ambientMapNoiseBuffer", path: soundPaths.ambientMapNoise, volume: 0.3 },
+      { key: "zombieAmbientBuffer", path: soundPaths.zombieAmbient, volume: 0.25 },
       { key: "bulletImpactBuffer", path: soundPaths.bulletImpact, volume: 0.4 },
       { key: "ambientMusicBuffer", path: soundPaths.ambientMusic, loop: true, volume: 0.25 },
       { key: "batBuffer", path: soundPaths.bats, volume: 0.6 },
+      // NEW: Game Over sounds
+      { key: "transitionBuffer", path: soundPaths.transition, volume: 0.7 },
+      { key: "outtaControlVOBuffer", path: soundPaths.outtaControlVO, volume: 1.0 },
       // --- Add VO Sound Definitions ---
       // Using actual filenames found earlier. Assumes soundPaths object will have corresponding keys.
       { key: "waveClearedVOBuffer", path: soundPaths.waveClearedVO, volume: 1.0 }, // e.g., '/sounds/AI VOICE/holy shit thats alot.mp3'
@@ -175,6 +198,9 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   // Internal state and setter for bat sound timing
   lastBatSoundPlayTime: 0,
   setLastBatSoundPlayTime: (time) => set({ lastBatSoundPlayTime: time }),
+  // Internal state and setter for zombie ambient sound timing
+  lastZombieAmbientPlayTime: 0,
+  setLastZombieAmbientPlayTime: (time) => set({ lastZombieAmbientPlayTime: time }),
 
   // --- Playback Functions ---
   playPistolSound: () => {
@@ -201,18 +227,35 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   playZombieDeathSound: () => get().zombieDeathBuffer?.play(),
   playGameStartSound: () => get().gameStartBuffer?.play(),
 
+  // NEW: Game Over sound playback
+  playTransitionSound: () => get().transitionBuffer?.play(),
+  playOuttaControlSound: () => get().outtaControlVOBuffer?.play(),
+
   // Play ambient map noise only if the interval has passed
   playAmbientMapNoiseSound: () => {
     if (!get().audioContextStarted) return;
     const now = Date.now();
     const lastPlayed = get().lastMapNoisePlayTime;
-    // Play roughly every 2 minutes (120000 ms)
-    if (now - lastPlayed > 120000) { 
+    if (now - lastPlayed > MAP_NOISE_INTERVAL) {
       const buffer = get().ambientMapNoiseBuffer;
       if (buffer && !buffer.playing()) {
         buffer.play();
         get().setLastMapNoisePlayTime(now);
         console.log("Playing ambient map noise");
+      }
+    }
+  },
+
+  playZombieAmbientSound: () => {
+    if (!get().audioContextStarted) return;
+    const now = Date.now();
+    const lastPlayed = get().lastZombieAmbientPlayTime;
+    if (now - lastPlayed > ZOMBIE_AMBIENT_INTERVAL) {
+      const buffer = get().zombieAmbientBuffer;
+      if (buffer && !buffer.playing()) {
+        buffer.play();
+        get().setLastZombieAmbientPlayTime(now);
+        console.log("Playing zombie ambient sound");
       }
     }
   },
@@ -311,6 +354,7 @@ export const useInitializeSounds = () => {
         zombieDeath: '/sounds/zombieDeath.mp3',
         gameStart: '/sounds/gameStart.mp3',
         ambientMapNoise: '/sounds/ambientMapNoise.mp3',
+        zombieAmbient: '/sounds/zombieAmbient.mp3', // Path for the new sound
         bulletImpact: '/sounds/bulletImpact.mp3',
         ambientMusic: '/sounds/ambient.mp3', // Corrected path
         bats: '/sounds/bats.mp3',
@@ -320,6 +364,8 @@ export const useInitializeSounds = () => {
         countdown3VO: '/sounds/AI VOICE/three two one.mp3',
         // countdown2VO: '/sounds/AI VOICE/countdown_2.mp3', // Add path if you have separate file
         // countdown1VO: '/sounds/AI VOICE/countdown_1.mp3', // Add path if you have separate file
+        transition: '/sounds/transition.mp3',
+        outtaControlVO: '/sounds/outtaControl.mp3',
       };
 
       loadSounds(soundPaths);

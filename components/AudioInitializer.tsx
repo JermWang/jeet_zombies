@@ -14,19 +14,21 @@ export default function AudioInitializer() {
 
   // Effect to handle initial user interaction for audio context
   useEffect(() => {
-    const handleClick = () => {
-      console.log("Initial user interaction detected.");
-      resumeAudioContext();
-      // Remove the listener after the first interaction
-      window.removeEventListener("click", handleClick);
-      window.removeEventListener("keydown", handleClick);
+    // console.log("Adding audio context resume listeners (click/keydown).");
+    const resumeAudio = () => {
+      if (Howler.ctx && Howler.ctx.state === "suspended") {
+        resumeAudioContext();
+        // Remove the listener after the first interaction
+        window.removeEventListener("click", resumeAudio);
+        window.removeEventListener("keydown", resumeAudio);
+      }
     };
 
     // Add listeners if context hasn't started yet
     if (!audioContextStarted) {
-      console.log("Adding audio context resume listeners (click/keydown).");
-      window.addEventListener("click", handleClick);
-      window.addEventListener("keydown", handleClick);
+      // console.log("Adding audio context resume listeners (click/keydown).");
+      window.addEventListener("click", resumeAudio);
+      window.addEventListener("keydown", resumeAudio);
     } else {
         console.log("Audio context already started, no listeners needed.");
     }
@@ -34,8 +36,8 @@ export default function AudioInitializer() {
     // Cleanup function to remove listeners if the component unmounts
     return () => {
        console.log("Cleaning up audio context resume listeners.");
-       window.removeEventListener("click", handleClick);
-       window.removeEventListener("keydown", handleClick);
+       window.removeEventListener("click", resumeAudio);
+       window.removeEventListener("keydown", resumeAudio);
     };
   }, [resumeAudioContext, audioContextStarted]); // Dependencies
 

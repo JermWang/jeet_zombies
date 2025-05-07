@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import * as THREE from 'three';
 import { Bullet } from './Bullet'; // Import the Bullet component
+import useGameStore from "@/hooks/useGameStore"; // NEW: Import useGameStore
 
 interface BulletState {
   id: number;
@@ -19,6 +20,7 @@ export const ShootingManager = memo(function ShootingManager() {
   // console.log("ShootingManager Render"); // Removed log
   const [bullets, setBullets] = useState<BulletState[]>([]);
   const bulletIdCounter = useRef(0); // Use useRef for the ID counter
+  const isGameOver = useGameStore((state) => state.isGameOver); // NEW: Get isGameOver state
 
   // Function to remove a bullet by its ID
   const removeBullet = useCallback((idToRemove: number) => {
@@ -31,6 +33,12 @@ export const ShootingManager = memo(function ShootingManager() {
   useEffect(() => {
     // Listener for the playerShoot custom event
     const handlePlayerShoot = (event: CustomEvent) => {
+      // NEW: Prevent shooting if game is over
+      if (isGameOver) {
+        console.log("[ShootingManager] Game is over. playerShoot event ignored.");
+        return;
+      }
+
       const { position, direction, weaponId, damage } = event.detail; // Get damage from event
       
       if (!position || !direction || !weaponId || typeof damage === 'undefined') {
@@ -58,7 +66,7 @@ export const ShootingManager = memo(function ShootingManager() {
     return () => {
       window.removeEventListener("playerShoot", handlePlayerShoot as EventListener);
     };
-  }, []); // Empty dependency array means this runs once on mount
+  }, [isGameOver]); // Empty dependency array means this runs once on mount
 
   return (
     <group> {/* Group to hold all bullet meshes */} 

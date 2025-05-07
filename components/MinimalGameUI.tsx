@@ -15,10 +15,29 @@ interface MinimalGameUIProps {
 
 export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: MinimalGameUIProps) {
   const [showControls, setShowControls] = useState(false)
-  const { isDebugMode, toggleDebugMode, currentWave, waveStatus, zombiesRemainingInWave } = useGameStore()
+  const {
+    isDebugMode,
+    toggleDebugMode,
+    currentWave,
+    waveStatus,
+    zombiesRemainingInWave,
+    health,
+    isGameOver,
+    isPlayerHit,
+    resetPlayerHit
+  } = useGameStore()
 
   const [waveMessage, setWaveMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (isPlayerHit) {
+      const timer = setTimeout(() => {
+        resetPlayerHit();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isPlayerHit, resetPlayerHit]);
 
   useEffect(() => {
     if (!gameStarted) {
@@ -59,6 +78,10 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
 
   return (
     <div className="absolute inset-0 pointer-events-none text-white font-pixel">
+      {isPlayerHit && (
+        <div className="absolute inset-0 bg-red-700 opacity-30 z-50"></div>
+      )}
+
       <div className="absolute top-4 right-4 pointer-events-auto z-10">
         <button
           onClick={toggleDebugMode}
@@ -67,6 +90,24 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
           Toggle Debug ({isDebugMode ? "On" : "Off"})
         </button>
       </div>
+
+      {/* Health Bar - Repositioned and Restyled */}
+      {gameStarted && !isGameOver && ( // Only show if game started and not game over
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex flex-col items-center pointer-events-auto w-64">
+          {/* Health bar background */}
+          <div className="w-full h-5 bg-neutral-800 border-2 border-neutral-600 rounded-sm overflow-hidden">
+            {/* Health bar fill */}
+            <div
+              className={`h-full ${health > 60 ? 'bg-red-500' : health > 30 ? 'bg-red-600' : 'bg-red-700'} transition-all duration-150 ease-linear`}
+              style={{ width: `${Math.max(0, health)}%` }} // Ensure width is not negative
+            />
+          </div>
+          {/* Health text below bar */}
+          <p className="mt-1 text-sm text-white">
+            {health}/100 HP
+          </p>
+        </div>
+      )}
 
       {gameStarted && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-center">
@@ -88,16 +129,40 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
           </div>
       )}
 
-      {!gameStarted && (
+      {isGameOver && gameStarted && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-auto z-20">
+          <div className="bg-black/80 p-8 rounded-lg">
+            <h2 className="text-5xl text-red-600 mb-4">GAME OVER</h2>
+            <Button
+              onClick={onReset}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-pixel px-6 py-3 text-lg"
+            >
+              RESTART
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!gameStarted && !isGameOver && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-auto">
-          <h1 className="text-4xl font-pixel text-red-500 mb-6">Jeet Zombies</h1>
-          <Button
-            onClick={onStart}
-            className="bg-red-600 hover:bg-red-700 text-white font-pixel px-8 py-4 text-xl"
-            disabled={!hasInteracted}
-          >
-            {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
-          </Button>
+          <div className="flex flex-col items-center mb-6">
+            <div className="relative inline-block">
+              <h1 className="text-4xl font-pixel text-red-600 uppercase">JEET ZOMBIES</h1>
+              <span
+                className="absolute -top-1 -right-8 text-xs font-pixel text-yellow-400 transform"
+              >
+                BETA
+              </span>
+            </div>
+
+            <Button
+              onClick={onStart}
+              className="bg-red-600 hover:bg-red-700 text-white font-pixel px-8 py-4 text-xl mt-4"
+              disabled={!hasInteracted}
+            >
+              {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
+            </Button>
+          </div>
 
           <div className="mt-4">
             <button
@@ -123,10 +188,8 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
             </div>
           )}
 
-          {/* Social Links Section - Moved back below controls */}
           <div className="flex flex-col items-center space-y-2 mt-6 pointer-events-auto px-4 w-full">
             <div className="flex space-x-4">
-              {/* Twitter Link */}
               <a 
                 href="https://x.com/JeetZombies" 
                 target="_blank" 
@@ -136,7 +199,6 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               >
                 <TwitterIcon className="w-6 h-6" />
               </a>
-              {/* Telegram Link */}
               <a 
                 href="https://t.me/JeetZombies" 
                 target="_blank" 
@@ -147,9 +209,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
                 <TelegramIcon className="w-6 h-6" />
               </a>
             </div>
-            {/* Added back Exclusively on GFM text */}
             <p className="text-white font-pixel-alt text-base">Exclusively on GFM</p> 
-            {/* CA Display and Copy Button */}
             <div className="flex items-center space-x-2 mt-1"> 
               <span className="text-gray-400 font-mono text-xs break-all">
                 YOUR_PLACEHOLDER_SOLANA_ADDRESS 

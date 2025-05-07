@@ -28,6 +28,11 @@ import WeaponPickup from "./WeaponPickup"; // Import the pickup component
 import WaveUI from "./WaveUI"; // Import the new UI component
 import SpawnPointFinder from "./SpawnPointFinder"; // ADDED
 import { OrbitControls, Sparkles } from "@react-three/drei"; // Import Sparkles
+import DriftingSparkles from './DriftingSparkles'; // Ensuring this is the active import
+import AmbientSoundManager from './AmbientSoundManager'; // ADD THIS LINE
+import PreviewCycleCamera from './PreviewCycleCamera'; // ADD THIS LINE
+import PreviewZombies from './PreviewZombies'; // ADD THIS LINE
+// import ScreenSpaceParticles from './ScreenSpaceParticles'; // REMOVE THIS LINE
 
 // Helper component to drive the physics worker step AND the main world step
 const PhysicsStepper = () => {
@@ -60,6 +65,8 @@ const ErrorFallback = ({ error }: { error: Error }) => (
 export default function Game() {
   const { gameStarted, startGame, resetGame, isDebugMode } = useGameStore()
   const [hasInteracted, setHasInteracted] = useState(false)
+  const [previewFadeOpacity, setPreviewFadeOpacity] = useState(1);
+  const [isInitialPreviewReady, setIsInitialPreviewReady] = useState(false); // New state for loading
 
   useEffect(() => {
     const handleInteraction = () => {
@@ -77,33 +84,55 @@ export default function Game() {
     }
   }, [])
 
+  const handleInitialPreviewReady = () => {
+    setIsInitialPreviewReady(true);
+  };
+
   return (
     <>
+      {/* Loading Text - Shown on black screen before initial fade-in completes */}
+      {!gameStarted && !isInitialPreviewReady && previewFadeOpacity === 1 && (
+        <div 
+          className="fixed inset-0 flex items-center justify-center pointer-events-none z-[1001]"
+          // zIndex higher than fade overlay to be visible on top of full black
+        >
+          <p className="text-2xl font-pixel text-red-500 animate-pulse">LOADING...</p>
+        </div>
+      )}
+
+      {/* Fade overlay for pre-game camera transitions */}
+      {!gameStarted && (
+        <div
+          style={{
+            position: 'fixed', 
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'black',
+            opacity: previewFadeOpacity, 
+            pointerEvents: 'none',
+            zIndex: 1000, 
+          }}
+        />
+      )}
+      
+      {/* 2D Screen Space Particles for Start Screen */}
+      {/* {!gameStarted && <ScreenSpaceParticles />} // REMOVE THIS LINE */}
+
       <Canvas shadows camera={{ position: [0, 5, 30], fov: 60 }}> {/* Adjust initial camera for better overview */}
         {/* Re-enable WaveManager */}
         {gameStarted && <WaveManager />} 
         <Suspense fallback={<Loading />}>
-          <Physics gravity={[0, -9.81, 0]} debug={isDebugMode}>
+          <Physics gravity={[0, -9.81, 0]} debug={gameStarted ? isDebugMode : false}>
             {/* Add OrbitControls and Sparkles when game is NOT started */}
             {!gameStarted && (
               <>
-                <OrbitControls 
-                  autoRotate 
-                  autoRotateSpeed={0.5} 
-                  enableZoom={false} 
-                  enablePan={false} 
-                  minPolarAngle={Math.PI / 4} // Prevent looking straight down
-                  maxPolarAngle={Math.PI / 2} // Prevent looking straight up
-                  target={[0, 1, 0]} // Point towards center of map
+                <PreviewCycleCamera 
+                  onFadeOpacityChange={setPreviewFadeOpacity} 
+                  onInitialFadeComplete={handleInitialPreviewReady} // Pass callback
                 />
-                <Sparkles 
-                  count={200}
-                  scale={[20, 20, 20]}
-                  size={3}
-                  speed={0.3}
-                  noise={0.1}
-                  color="red"
-                />
+                <PreviewZombies /> {/* ADD PREVIEW ZOMBIES */}
               </>
             )}
             <SimpleEnvironment />
@@ -123,6 +152,10 @@ export default function Game() {
             {/* Add the component that calls stepPhysics */} 
             <PhysicsStepper /> 
             <SpawnPointFinder /> {/* ADDED: Render the finder inside Physics */}
+            <AmbientSoundManager /> {/* ADD THIS LINE INSIDE CANVAS/PHYSICS IF APPROPRIATE, OR OUTSIDE CANVAS IF NOT 3D SPECIFIC */}
+
+            {/* --- Sparkles for both start screen and in-game --- */}
+            <DriftingSparkles /> 
 
             {/* --- Weapon Pickups --- */} 
             {gameStarted && (
@@ -153,6 +186,10 @@ export default function Game() {
         hasInteracted={hasInteracted} 
       />
       {gameStarted && <GunUI />}
+      {/* Add AmbientSoundManager here if it should be outside the Canvas but tied to gameStarted state */}
+      {/* For example, if it should persist even if Canvas unmounts/remounts for some reason but game is still on */} 
+      {/* However, since it uses useGameStore, it can effectively be anywhere as long as it's mounted when gameStarted is true */} 
+      {/* Let's place it with other global game systems for clarity, often these are outside the Canvas */} 
     </>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { create } from "zustand"
+import { createWithEqualityFn } from 'zustand/traditional'
+import { shallow } from 'zustand/shallow'
 import type { Vector3 } from "three"
 import { Vector3 as Vector3Impl } from "three"
 import * as THREE from 'three' // Import THREE for Vector3 usage
@@ -68,6 +69,7 @@ interface GameState {
   playerPosition: Vector3 | null
   cameraAngle: number
   isDebugMode: boolean
+  isPlayerHit: boolean; // NEW: For player hit flash effect
   // Enemy State
   enemies: EnemyState[]; // This now acts as the pool
   enemyIdCounter: number; // Still useful for unique IDs
@@ -82,6 +84,7 @@ interface GameState {
 
   decreaseHealth: (amount: number) => void
   increaseScore: (amount: number) => void
+  resetPlayerHit: () => void; // NEW: Action to reset player hit state
   startGame: () => void
   resetGame: () => void
   setPlayerPosition: (position: Vector3) => void
@@ -104,7 +107,8 @@ interface GameState {
 const enemyHitResetTimeouts = new Map<number, NodeJS.Timeout>();
 const FLASH_DURATION_MS = 150; // Duration for the hit flash
 
-const useGameStore = create<GameState>((set, get) => ({
+const useGameStore = createWithEqualityFn<GameState>(
+  (set, get) => ({
   health: 100,
   score: 0,
   isGameOver: false,
@@ -113,25 +117,29 @@ const useGameStore = create<GameState>((set, get) => ({
   playerPosition: null,
   cameraAngle: 0,
   isDebugMode: true,
-  // Enemy State Initialization
-  enemies: [], // Pool starts empty, populated by startGame/resetGame
+  isPlayerHit: false, // NEW: Initial state for player hit
+    enemies: [],
   enemyIdCounter: 0,
-
-  // Wave State Initialization
   currentWave: 0,
   zombiesRemainingInWave: 0,
-  totalZombiesInWave: 0, // Initialize new state
+    totalZombiesInWave: 0,
   waveStatus: 'Idle',
-
-  findSafeSpawnPoint: null, // ADDED: Initial state
+    findSafeSpawnPoint: null,
 
   decreaseHealth: (amount) =>
     set((state) => {
-      const newHealth = Math.max(0, state.health - amount)
+        const newHealth = Math.max(0, state.health - amount);
+        const gameOver = newHealth <= 0;
+      // NEW: Play game over sounds if it just became game over
+      if (gameOver && !state.isGameOver) { 
+        useSoundEffects.getState().playTransitionSound();
+        useSoundEffects.getState().playOuttaControlSound();
+      }
       return {
         health: newHealth,
-        isGameOver: newHealth <= 0,
-      }
+        isGameOver: gameOver, // Use the calculated gameOver state
+        isPlayerHit: true, 
+        };
     }),
 
   increaseScore: (amount) =>
@@ -139,17 +147,18 @@ const useGameStore = create<GameState>((set, get) => ({
       score: state.score + amount,
     })),
 
-  // Initialize or reset the game state, including pre-populating the enemy pool
+  resetPlayerHit: () => set({ isPlayerHit: false }), // NEW: Implementation for resetPlayerHit
+
   startGame: () => {
     const initialEnemies: EnemyState[] = [];
     let counter = 0;
     for (let i = 0; i < MAX_ENEMIES_IN_POOL; i++) {
         initialEnemies.push({
             id: counter++,
-            type: 'zombie_standard_shirt', // Default type, can be changed on spawn
-            position: new Vector3Impl(0, -1000, 0), // Start inactive enemies off-screen
+          type: 'zombie_standard_shirt',
+          position: new Vector3Impl(0, -1000, 0),
             health: 0,
-            isDead: true, // Start all enemies in the pool as inactive
+          isDead: true,
             physicsBodyId: null,
         });
     }
@@ -159,22 +168,18 @@ const useGameStore = create<GameState>((set, get) => ({
       health: 100,
       score: 0,
       enemies: initialEnemies, 
-      enemyIdCounter: counter, // Set counter based on pool size
+        enemyIdCounter: counter,
       currentWave: 0,
       zombiesRemainingInWave: 0,
-      totalZombiesInWave: 0, // Initialize new state
+        totalZombiesInWave: 0,
       waveStatus: 'Idle',
     });
     console.log(`Game started, enemy pool initialized. Wave status: Idle.`);
-
-    // --- ALSO SPAWN THE BOSS --- 
     const bossSpawnPos = new Vector3Impl(0, -0.04, -10); 
     console.log("Attempting to spawn initial boss...");
-    get().spawnEnemy('zombie_boss', bossSpawnPos); // Call spawnEnemy for the boss
-
+      get().spawnEnemy('zombie_boss', bossSpawnPos);
   },
 
-  // Reset could potentially reuse the existing pool or re-initialize like startGame
   resetGame: () => {
     const initialEnemies: EnemyState[] = [];
     let counter = 0;
@@ -182,7 +187,7 @@ const useGameStore = create<GameState>((set, get) => ({
         initialEnemies.push({
             id: counter++,
             type: 'zombie_standard_shirt',
-            position: new Vector3Impl(0, -1000, 0),
+            position: new Vector3Impl(0, -1000, 0), // Move inactive enemies far away
             health: 0,
             isDead: true,
             physicsBodyId: null,
@@ -191,18 +196,19 @@ const useGameStore = create<GameState>((set, get) => ({
      set({
       health: 100,
       score: 0,
-      isGameOver: false,
-      gameStarted: true, 
-      playerPosition: new Vector3Impl(0, 1, 0),
+      isGameOver: false,       // Ensure game over is reset
+      gameStarted: false,      // THIS IS THE KEY CHANGE: Return to main menu
+      playerPosition: null,    // Reset player position (or to a menu default if any)
       enemies: initialEnemies, 
-      enemyIdCounter: counter,
+      enemyIdCounter: counter, // Reset counter if re-pooling from scratch
       currentWave: 0,
       zombiesRemainingInWave: 0,
-      totalZombiesInWave: 0, // Initialize new state
+      totalZombiesInWave: 0,
       waveStatus: 'Idle',
-      findSafeSpawnPoint: null, // Reset function reference
+      findSafeSpawnPoint: null, // Reset this if it was set during gameplay
+      isPlayerHit: false,       // Reset player hit state
     });
-     console.log(`Game reset, enemy pool re-initialized. Wave status: Idle.`);
+     console.log(`Game reset, returning to main menu. Wave status: Idle.`);
   },
 
   setPlayerPosition: (position) =>
@@ -222,188 +228,165 @@ const useGameStore = create<GameState>((set, get) => ({
 
   toggleDebugMode: () => set((state) => ({ isDebugMode: !state.isDebugMode })),
 
-  // --- Enemy Management Functions (Object Pooling Logic) ---
-
-  // Finds an inactive enemy, activates it, and sets its properties
   spawnEnemy: (type, position) => {
-    // --- Add Stack Trace ---
-    console.trace(`[spawnEnemy Store Action] Called for type: ${type}`);
-    // -----------------------
-    // --- Add Detailed Logging ---
-    console.log(`[spawnEnemy Store Action] Received call. Type: ${type}, Requested Position: { x: ${position.x.toFixed(2)}, y: ${position.y.toFixed(2)}, z: ${position.z.toFixed(2)} }`);
-    // -------------------------
-    const config = ENEMY_CONFIGS[type];
-    if (!config) {
-      console.warn(`[spawnEnemy Store Action] Attempted to spawn enemy with unknown type: ${type}`);
-      return null; 
-    }
-
     let spawnedEnemyId: number | null = null;
 
     set((state) => {
-      // --- Add Detailed Logging ---
-      console.log(`[spawnEnemy Store Action] Searching pool (size: ${state.enemies.length}) for inactive enemy...`);
-      // -------------------------
+      const config = ENEMY_CONFIGS[type];
+      if (!config) {
+        console.warn(`[spawnEnemy Store Action] Attempted to spawn enemy with unknown type: ${type}`);
+        return state; // No change, return original state reference
+      }
+      
       const availableEnemyIndex = state.enemies.findIndex(enemy => enemy.isDead);
 
       if (availableEnemyIndex !== -1) {
-        const enemiesCopy = [...state.enemies]; 
-        const enemyToSpawn = enemiesCopy[availableEnemyIndex];
-        spawnedEnemyId = enemyToSpawn.id; // Store the ID early for logging
-        // --- Add Detailed Logging ---
-        console.log(`[spawnEnemy Store Action] Found inactive Enemy ID: ${spawnedEnemyId} at pool index ${availableEnemyIndex}. Activating...`);
-        console.log(`[spawnEnemy Store Action] Assigning position: { x: ${position.x.toFixed(2)}, y: ${position.y.toFixed(2)}, z: ${position.z.toFixed(2)} } to Enemy ID: ${spawnedEnemyId}`);
-        // -------------------------
+        spawnedEnemyId = state.enemies[availableEnemyIndex].id; // Get ID before mapping
+        
+        const newEnemiesArray = state.enemies.map((enemy, index) => {
+          if (index === availableEnemyIndex) {
+            // Return a NEW object only for the changed enemy
+            return {
+              ...enemy, // Spread existing properties
+              type: type,
+              position: new Vector3Impl(position.x, position.y, position.z), // Ensure a new Vector3 instance
+              health: config.health,
+              isDead: false,
+              physicsBodyId: null, // Reset physicsBodyId, will be set by physics system
+              isHit: false,
+            };
+          }
+          return enemy; // Return existing object reference for unchanged enemies
+        });
 
-        // Update the found enemy's state
-        enemyToSpawn.type = type;
-        // console.log(`[spawnEnemy Store Action] Assigning position: X=${position.x.toFixed(2)}, Y=${position.y.toFixed(2)}, Z=${position.z.toFixed(2)} to Enemy ID: ${spawnedEnemyId}`);
-        enemyToSpawn.position.copy(position); 
-        enemyToSpawn.health = config.health;
-        enemyToSpawn.isDead = false; 
-        enemyToSpawn.physicsBodyId = null; // Reset physics IDs
-        enemyToSpawn.isHit = false; // Reset hit state
-        
-        // Optionally log state changes here if needed
-        
-        return { enemies: enemiesCopy }; 
+        return { 
+          ...state, // Preserve other state parts
+          enemies: newEnemiesArray, 
+          zombiesRemainingInWave: state.zombiesRemainingInWave + 1 
+        };
       } else {
-        // --- Add Detailed Logging ---
-        console.warn(`[spawnEnemy Store Action] No inactive enemy found in the pool (Pool Size: ${state.enemies.length}). Spawn failed.`);
-        // -------------------------
-        spawnedEnemyId = null; // Ensure ID is null if no spawn
-        return {}; // No change to state
+          console.warn("[spawnEnemy Store Action] No inactive enemies available in the pool.");
+          return state; // No change, return original state reference
       }
     });
-
-    // Return the ID of the spawned enemy (or null if failed)
-    console.log(`[spawnEnemy Store Action] Returning spawned ID: ${spawnedEnemyId}`);
     return spawnedEnemyId;
   },
 
   damageEnemy: (id, amount) => {
-    let enemyKilled = false; 
-    let scoreToAdd = 0;
-    const config = get().enemies.find(e => e.id === id)?.type ? getEnemyConfig(get().enemies.find(e => e.id === id)!.type) : null;
-    let shouldPlayDeathSound = false; // Flag to play sound outside set
-
     set((state) => {
-      const newEnemies = state.enemies.map((enemy) => {
+      let targetEnemyHit = false;
+      let enemyDied = false; // NEW: Flag to check if enemy died in this action
+      const newEnemies = state.enemies.map(enemy => {
         if (enemy.id === id && !enemy.isDead) {
+          targetEnemyHit = true;
           const newHealth = Math.max(0, enemy.health - amount);
-          const isNowDead = newHealth <= 0;
-          if (isNowDead && !enemy.isDead) {
-             console.log(`Enemy ${enemy.type} (ID: ${id}) died.`);
-             enemyKilled = true; 
-             shouldPlayDeathSound = true; // Set flag to play sound
-             if (config) { // Use the config fetched outside set
-                // Simple score based on initial health, adjust as needed
-                scoreToAdd = config.health / 10; 
-             }
-          }
-          // Set isHit to true, update health, update isDead
-          return { ...enemy, health: newHealth, isDead: isNowDead, isHit: !isNowDead }; // Only set isHit if not dead
+          const justDied = newHealth <= 0;
+          if (justDied) enemyDied = true; // NEW: Set flag if enemy died
+          return {
+            ...enemy,
+            health: newHealth,
+            isDead: justDied,
+            isHit: true, // Set isHit to true for visual feedback
+          };
         }
         return enemy;
       });
-      return { enemies: newEnemies };
+
+      if (targetEnemyHit) {
+        const newlyDeactivatedCount = newEnemies.find(e => e.id === id)?.isDead && !state.enemies.find(e => e.id === id)?.isDead ? 1 : 0;
+        // NEW: Play death sound if enemyDied is true
+        if (enemyDied) {
+          useSoundEffects.getState().playZombieDeathSound(); 
+        }
+        return {
+          ...state,
+          enemies: newEnemies,
+          score: newEnemies.find(e => e.id === id)?.isDead ? state.score + 10 : state.score, // Add score if enemy died
+          zombiesRemainingInWave: state.zombiesRemainingInWave - newlyDeactivatedCount,
+        };
+      }
+      return state; // No enemy found or no change
     });
 
-    // Clear any existing reset timeout for this enemy
-    if (enemyHitResetTimeouts.has(id)) {
-      clearTimeout(enemyHitResetTimeouts.get(id));
-    }
+    // Reset the isHit flag after a short delay for visual effect
+    const enemyToReset = useGameStore.getState().enemies.find(e => e.id === id);
+    if (enemyToReset && enemyToReset.isHit) {
+        // Clear existing timeout for this enemy if one exists
+        const existingTimeout = enemyHitResetTimeouts.get(id);
+        if (existingTimeout) clearTimeout(existingTimeout);
 
-    // Set a new timeout to reset the isHit flag if the enemy wasn't killed
-    if (!enemyKilled) {
-      const timeoutId = setTimeout(() => {
-        set((state) => ({
-          enemies: state.enemies.map((enemy) =>
-            enemy.id === id ? { ...enemy, isHit: false } : enemy
-          ),
-        }));
-        enemyHitResetTimeouts.delete(id); // Remove from map once executed
-      }, FLASH_DURATION_MS);
-      enemyHitResetTimeouts.set(id, timeoutId);
-    }
-
-    // Play death sound if flagged
-    if (shouldPlayDeathSound) {
-        const soundState = useSoundEffects.getState();
-        if (soundState.playZombieDeathSound) { // Check if function exists
-             soundState.playZombieDeathSound();
-        } else {
-            console.warn("[GameStore damageEnemy] playZombieDeathSound function not found in sound state.");
-        }
-    }
-
-    if (enemyKilled && scoreToAdd > 0) {
-      get().increaseScore(scoreToAdd);
-       console.log(`Increased score by ${scoreToAdd} for killing enemy ID ${id}`);
+        const newTimeout = setTimeout(() => {
+            set(state => ({
+                ...state,
+                enemies: state.enemies.map(e => 
+                    e.id === id ? { ...e, isHit: false } : e
+                )
+            }));
+            enemyHitResetTimeouts.delete(id);
+        }, FLASH_DURATION_MS);
+        enemyHitResetTimeouts.set(id, newTimeout);
     }
   },
 
-  // Marks an enemy as inactive (returns it to the pool)
-  deactivateEnemy: (id) => {
-    console.log(`[deactivateEnemy Store Action] Deactivating enemy ID: ${id}`);
-    const playZombieDeathSound = useSoundEffects.getState().playZombieDeathSound;
+  deactivateEnemy: (id) => { // Used for when an enemy is explicitly removed or despawned by game logic other than dying
     set((state) => {
-       const enemiesCopy = [...state.enemies];
-       const enemyIndex = enemiesCopy.findIndex(e => e.id === id);
-       if (enemyIndex !== -1) {
-           enemiesCopy[enemyIndex].isDead = true;
-           enemiesCopy[enemyIndex].health = 0;
-           enemiesCopy[enemyIndex].position.set(0, -1000, 0); // Move inactive off-screen
-           enemiesCopy[enemyIndex].physicsBodyId = null; // Clear physics ID
-            console.log(`[deactivateEnemy Store Action] Successfully deactivated enemy ID: ${id}`);
-           return { enemies: enemiesCopy };
-       } else {
-            console.warn(`[deactivateEnemy Store Action] Could not find enemy ID: ${id} to deactivate.`);
-           return {};
-       }
-   });
-   // Update wave count if waves are active
-    if (get().waveStatus === 'Active') {
-       set((state) => ({ zombiesRemainingInWave: state.zombiesRemainingInWave - 1 }));
-   }
+      let wasActive = false;
+      const newEnemies = state.enemies.map(enemy => {
+        if (enemy.id === id && !enemy.isDead) {
+          wasActive = true;
+          return {
+            ...enemy,
+            health: 0, // Typically set health to 0
+            isDead: true,
+            position: new Vector3Impl(0, -1000, 0), // Move out of sight
+          };
+        }
+        return enemy;
+      });
+
+      if (wasActive) {
+        return {
+          ...state,
+          enemies: newEnemies,
+          zombiesRemainingInWave: Math.max(0, state.zombiesRemainingInWave - 1),
+        };
+      }
+      return state;
+    });
   },
 
-  // Updates the physics body ID for a specific enemy
   setEnemyPhysicsId: (id, physicsId) => {
     set((state) => ({
-      enemies: state.enemies.map((enemy) =>
+      ...state,
+      enemies: state.enemies.map(enemy =>
         enemy.id === id ? { ...enemy, physicsBodyId: physicsId } : enemy
       ),
     }));
   },
 
-  // --- Wave Action Implementations ---
   startWaveSpawning: (waveNumber, totalZombieCount) => {
-    console.log(`Store: Setting state for Wave ${waveNumber} spawning (${totalZombieCount} zombies)`);
     set({
+        currentWave: waveNumber,
       waveStatus: 'Spawning',
-      currentWave: waveNumber,
-      zombiesRemainingInWave: totalZombieCount, // Start remaining count
-      totalZombiesInWave: totalZombieCount, // Store total count
+        zombiesRemainingInWave: 0, // Reset for the new wave, will increment as they spawn
+        totalZombiesInWave: totalZombieCount, // Set total for this wave
     });
+      console.log(`[WaveManager] Wave ${waveNumber} spawning started. Total zombies: ${totalZombieCount}`);
   },
-
   setWaveActive: () => {
-    console.log("Store: Setting wave status to Active");
     set({ waveStatus: 'Active' });
+      console.log(`[WaveManager] Wave ${get().currentWave} is now active.`);
   },
-  
   setWaveBetween: () => {
-    console.log("Store: Setting wave status to BetweenWaves");
     set({ waveStatus: 'BetweenWaves' });
+      console.log(`[WaveManager] Wave ${get().currentWave} cleared. Entering between-wave state.`);
   },
-
-  // ADDED: Action to set the function reference
   setFindSafeSpawnPoint: (finder) => {
-    // console.log("[Store] Setting findSafeSpawnPoint function."); // Optional log
     set({ findSafeSpawnPoint: finder });
   },
-}))
+  }),
+  shallow // Default equality function
+);
 
 // Import getEnemyConfig needed for score calculation
 import { getEnemyConfig } from "@/data/enemies"; 

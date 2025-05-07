@@ -7,6 +7,7 @@ import { useGLTF, useAnimations } from "@react-three/drei"
 import * as THREE from 'three'
 import useGameStore from "@/hooks/useGameStore" // Corrected path
 import { useSoundEffects } from "@/hooks/useSoundEffects" // Added for death sounds
+import { shallow } from 'zustand/shallow'
 
 // Define constants locally
 const ZOMBIE_SPEED = 1.5;
@@ -54,6 +55,10 @@ const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   // Add more types if needed
 }
 
+// --- Attack Constants ---
+const DEFAULT_ATTACK_DAMAGE = 10;
+const DEFAULT_ATTACK_COOLDOWN = 2; // seconds
+
 // Individual Enemy Component (Formerly Zombie)
 function Enemy({ 
   id,
@@ -72,6 +77,7 @@ function Enemy({
   const groupRef = useRef<THREE.Group>(null)
   const { playZombieDeathSound } = useSoundEffects(); // Get death sound player
   const [deathAnimationPlayed, setDeathAnimationPlayed] = useState(false); // Track if death sound/logic ran
+  const lastAttackTimeRef = useRef(0); // Stores the time of the last attack
   
   // --- Refs for procedural animation --- 
   // Use separate refs for each type if structure differs significantly, 
@@ -94,7 +100,10 @@ function Enemy({
   // Pass animations array (empty for non-boss)
   const { actions, names } = useAnimations(animations, groupRef) 
   
-  const { playerPosition } = useGameStore()
+  const { playerPosition, decreaseHealth } = useGameStore(
+    (state) => ({ playerPosition: state.playerPosition, decreaseHealth: state.decreaseHealth }),
+    shallow // Using shallow for selector optimization
+  );
 
   const [currentAction, setCurrentAction] = useState<string | null>(null)
 
@@ -177,9 +186,45 @@ function Enemy({
     // Don't run frame logic if dead
     if (isDead || !enemyRef.current || !playerPosition || !groupRef.current) return;
     const enemyRb = enemyRef.current;
+    const enemyPosition = enemyRb.translation();
+    const enemyObject = groupRef.current; // The 3D object for orientation
 
-    // --- Movement/Rotation Logic (Still Commented Out) --- 
-    // ... 
+    const enemyConfig = ENEMY_CONFIGS[type] || ENEMY_CONFIGS.zombie_standard_shirt; // Fallback to standard
+    const currentSpeed = enemyConfig.speed;
+    const attackRange = enemyConfig.attackRange;
+
+    // --- Movement/Rotation Logic ---
+    const direction = new THREE.Vector3().subVectors(playerPosition, enemyPosition).normalize();
+    const desiredVelocity = direction.multiplyScalar(currentSpeed);
+
+    // Apply linear velocity for movement (physics worker will handle this if integrated)
+    // For now, direct velocity setting:
+    enemyRb.setLinvel({ x: desiredVelocity.x, y: enemyRb.linvel().y, z: desiredVelocity.z }, true);
+    
+    // Rotation: Make the enemy look at the player (only on the Y axis)
+    const targetAngle = Math.atan2(playerPosition.x - enemyPosition.x, playerPosition.z - enemyPosition.z);
+    const currentRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, enemyObject.rotation.y, 0));
+    const targetRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, targetAngle, 0));
+    
+    // Smoothly interpolate rotation
+    currentRotation.slerp(targetRotation, 0.1); // Adjust slerp factor for faster/slower turning
+    enemyObject.rotation.setFromQuaternion(currentRotation);
+
+    // --- Attack Logic ---
+    const distanceToPlayer = playerPosition.distanceTo(enemyPosition);
+    const currentTime = state.clock.elapsedTime;
+
+    if (distanceToPlayer <= attackRange) {
+      if (currentTime - lastAttackTimeRef.current > DEFAULT_ATTACK_COOLDOWN) {
+        console.log(`Enemy ${id} attacking player!`);
+        decreaseHealth(DEFAULT_ATTACK_DAMAGE);
+        lastAttackTimeRef.current = currentTime;
+        // TODO: Play attack animation/sound
+        // if (type === 'zombie_boss' && actions && actions.attack) {
+        //   actions.attack.reset().play();
+        // }
+      }
+    }
 
     // --- Animation Logic --- 
     const time = state.clock.elapsedTime;
@@ -437,23 +482,40 @@ function Enemy({
   )
 }
 
+// Individual Zombie (Enemy) rendering
+interface EnemyProps {
+  id: number;
+  position: THREE.Vector3;
+  type?: string; // Type from ENEMY_CONFIGS keys
+  health: number;
+  isDead: boolean;
+}
+
+const EnemyInstance = React.memo<EnemyProps>(({ id, position, type = 'zombie_standard_shirt', health, isDead }) => {
+  // Renamed from Enemy to EnemyInstance to avoid conflict with the function name
+  return <Enemy id={id} position={position} type={type} health={health} isDead={isDead} />;
+});
+EnemyInstance.displayName = 'EnemyInstance';
+
 // Main Enemies Manager Component
 export default function Enemies() {
-  // Get state and functions from the store
-  const enemies = useGameStore((state) => state.enemies); // Only select enemies
+  const enemies = useGameStore((state) => state.enemies);
+  console.log("[Enemies Component] Rendering enemies:", enemies.filter(e => !e.isDead).length);
 
   return (
-    <group>
-      {enemies.map((data) => (
-        <Enemy 
-          key={data.id} // Use stable ID from store state
-          id={data.id} 
-          position={data.position} 
-          type={data.type} 
-          health={data.health} // Pass health
-          isDead={data.isDead} // Pass isDead
-        />
-      ))}
-    </group>
-  )
+    <>
+      {enemies.map((enemyData) => 
+        !enemyData.isDead && enemyData.type && ENEMY_CONFIGS[enemyData.type] ? ( // Check if type is valid
+          <EnemyInstance
+            key={enemyData.id}
+            id={enemyData.id}
+            type={enemyData.type}
+            position={enemyData.position}
+            health={enemyData.health} // Pass health
+            isDead={enemyData.isDead}   // Pass isDead
+          />
+        ) : null
+      )}
+    </>
+  );
 } 

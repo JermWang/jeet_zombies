@@ -66,9 +66,9 @@ export default function Player() {
   const { 
     playPistolSound, playShotgunSound, playSmgSound, playRifleSound,
     playWeaponSwitchSound, playJumpSound, playLandSound, playZombieBiteSound,
-    playAmbientMapNoiseSound, ambientMapNoiseBuffer,
-    playAmbientMusic, ambientMusicBuffer,
-    audioContextStarted
+    playAmbientMapNoiseSound, playZombieAmbientSound,
+    ambientMapNoiseBuffer, ambientMusicBuffer,
+    playAmbientMusic, audioContextStarted
   } = useSoundEffects(state => ({ 
       playPistolSound: state.playPistolSound,
       playShotgunSound: state.playShotgunSound,
@@ -79,9 +79,10 @@ export default function Player() {
       playLandSound: state.playLandSound,
       playZombieBiteSound: state.playZombieBiteSound,
       playAmbientMapNoiseSound: state.playAmbientMapNoiseSound,
+      playZombieAmbientSound: state.playZombieAmbientSound,
       ambientMapNoiseBuffer: state.ambientMapNoiseBuffer,
-      playAmbientMusic: state.playAmbientMusic,
       ambientMusicBuffer: state.ambientMusicBuffer,
+      playAmbientMusic: state.playAmbientMusic,
       audioContextStarted: state.audioContextStarted
   }))
   const {
@@ -529,7 +530,12 @@ export default function Player() {
     } else if (audioContextStarted && !ambientMusicBuffer) {
         console.log("Player: Audio context ready, waiting for ambient music buffer...");
     }
-  }, [audioContextStarted, ambientMusicBuffer, playAmbientMusic]);
+    // Call other periodic ambient sounds here too
+    if (audioContextStarted) {
+      playAmbientMapNoiseSound();
+      playZombieAmbientSound(); // Call the new zombie ambient sound
+    }
+  }, [audioContextStarted, ambientMusicBuffer, playAmbientMusic, playAmbientMapNoiseSound, playZombieAmbientSound]);
 
   // Adjust Camera FOV
   useEffect(() => {
@@ -540,13 +546,25 @@ export default function Player() {
     }
   }, [camera]); // Run when camera object is available
 
+  // Use useFrame for game logic, physics, and camera updates
   useFrame((state, delta) => {
-    // console.log(`[Player useFrame] delta: ${delta.toFixed(6)}`); // TEMP DISABLED
-    if (typeof window !== "undefined" && (window as any).startComponentTimer) {
-      ;(window as any).startComponentTimer("Player")
+    // If game is over, stop all player updates
+    if (isGameOver) {
+      if (playerRef.current) {
+        playerRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true); // Stop movement
+        playerRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true); // Stop rotation
+      }
+      // Optionally, disable pointer lock if it was enabled
+      if (mouseLookEnabled && document.pointerLockElement) { // Only exit if it was active
+        document.exitPointerLock();
+      }
+      return; // Skip all other player logic
     }
 
-    const player = playerRef.current;
+    animationTime.current += delta
+    const time = state.clock.elapsedTime
+
+    const player = playerRef.current
     if (!player) return;
     
     const currentPositionRapier = player.translation();
