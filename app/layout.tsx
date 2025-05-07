@@ -19,9 +19,30 @@ const vt323 = VT323({
 })
 
 export const metadata = {
-  title: "Zombie Survival Game",
-  description: "A survival game built with Next.js and React Three Fiber",
-  generator: 'v0.dev'
+  title: "JEET ZOMBIES",
+  description: "HOLY SHIT! thats alotta jeets!",
+  generator: 'v0.dev',
+  metadataBase: new URL('https://jeetzombies.xyz'),
+  openGraph: {
+    title: "JEET ZOMBIES",
+    description: "HOLY SHIT! thats alotta jeets!",
+    url: 'https://jeetzombies.xyz',
+    images: [
+      {
+        url: '/jeetzombies.jpg', // Relative to metadataBase
+        width: 1200, // Optional: Specify image width
+        height: 630, // Optional: Specify image height
+        alt: 'JEET ZOMBIES Social Share Image',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "JEET ZOMBIES",
+    description: "HOLY SHIT! thats alotta jeets!",
+    images: ['/jeetzombies.jpg'], // Relative to metadataBase, or absolute URL
+  },
 }
 
 export default function RootLayout({
