@@ -12,6 +12,7 @@ import Enemies from "./Enemies"
 import Loading from "./Loading"
 import { MinimalGameUI } from "./MinimalGameUI"
 import useGameStore from "@/hooks/useGameStore"
+import type { WeaponPickupState } from "@/hooks/useGameStore"
 // import Shooting from "./Shooting"
 // import BulletImpacts from "./BulletImpacts"
 import GunUI from "./GunUI"
@@ -33,6 +34,10 @@ import AmbientSoundManager from './AmbientSoundManager'; // ADD THIS LINE
 import PreviewCycleCamera from './PreviewCycleCamera'; // ADD THIS LINE
 import PreviewZombies from './PreviewZombies'; // ADD THIS LINE
 // import ScreenSpaceParticles from './ScreenSpaceParticles'; // REMOVE THIS LINE
+
+// import AmmoPickup from "./AmmoPickup"; // REMOVED: PickupManager will handle this
+// import type { AmmoPickupState } from "@/hooks/useGameStore"; // REMOVED
+import PickupManager from "./PickupManager"; // NEW: Import PickupManager
 
 // Helper component to drive the physics worker step AND the main world step
 const PhysicsStepper = () => {
@@ -64,6 +69,8 @@ const ErrorFallback = ({ error }: { error: Error }) => (
 
 export default function Game() {
   const { gameStarted, startGame, resetGame, isDebugMode } = useGameStore()
+  // const initializeWeaponPickups = useGameStore((state) => state.initializeWeaponPickups); // REMOVED
+  // const initializeAmmoPickups = useGameStore((state) => state.initializeAmmoPickups); // REMOVED
   const [hasInteracted, setHasInteracted] = useState(false)
   const [previewFadeOpacity, setPreviewFadeOpacity] = useState(1);
   const [isInitialPreviewReady, setIsInitialPreviewReady] = useState(false); // New state for loading
@@ -87,6 +94,9 @@ export default function Game() {
   const handleInitialPreviewReady = () => {
     setIsInitialPreviewReady(true);
   };
+
+  // NEW: Initialize ammo pickups on mount
+  // useEffect(() => { ... }); // REMOVED Ammo pickup initialization block
 
   return (
     <>
@@ -124,7 +134,10 @@ export default function Game() {
         {/* Re-enable WaveManager */}
         {gameStarted && <WaveManager />} 
         <Suspense fallback={<Loading />}>
-          <Physics gravity={[0, -9.81, 0]} debug={gameStarted ? isDebugMode : false}>
+          <Physics 
+            gravity={[0, -9.81, 0]} 
+            debug={process.env.NODE_ENV === 'development' && gameStarted && isDebugMode}
+          >
             {/* Add OrbitControls and Sparkles when game is NOT started */}
             {!gameStarted && (
               <>
@@ -158,14 +171,15 @@ export default function Game() {
             <DriftingSparkles /> 
 
             {/* --- Weapon Pickups --- */} 
-            {gameStarted && (
-                <>
-                    <WeaponPickup weaponId="shotgun" position={[-10, 1.5, -5]} />
-                    <WeaponPickup weaponId="smg" position={[10, 1.5, -5]} />
-                    <WeaponPickup weaponId="rifle" position={[0, 1.5, 15]} />
-                </>
-            )}
+            {/* {gameStarted && ( ... )} REMOVED direct rendering */}
             {/* --- End Weapon Pickups --- */} 
+
+            {/* --- Ammo Pickups --- */} 
+            {/* {gameStarted && ( ... )} REMOVED direct rendering */}
+            {/* --- End Ammo Pickups --- */} 
+
+            {/* NEW: Render PickupManager */} 
+            {gameStarted && <PickupManager />}
 
             {/* EffectComposer removed to prevent runtime error */}
             {/* {gameStarted && (

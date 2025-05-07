@@ -18,6 +18,7 @@ interface WeaponState {
   setReloading: (isReloading: boolean) => void
   setShooting: (isShooting: boolean) => void
   addAmmo: (weaponId: string, amount: number) => void
+  refuelAllWeapons: (amount: number) => void
 }
 
 const useWeaponStore = create<WeaponState>((set, get) => ({
@@ -123,6 +124,21 @@ const useWeaponStore = create<WeaponState>((set, get) => ({
         },
       },
     }))
+  },
+
+  refuelAllWeapons: (amount) => {
+    set((state) => {
+      const newAmmo = { ...state.ammo };
+      state.availableWeapons.forEach(weaponId => {
+        if (newAmmo[weaponId] && weapons[weaponId]) { // Ensure weapon exists in ammo record and config
+          newAmmo[weaponId] = {
+            ...newAmmo[weaponId],
+            reserve: Math.min(newAmmo[weaponId].reserve + amount, weapons[weaponId].maxAmmo),
+          };
+        }
+      });
+      return { ammo: newAmmo };
+    });
   },
 }))
 

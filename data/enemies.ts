@@ -10,7 +10,8 @@ export interface EnemyConfig {
   visualYOffset: number; // Vertical offset for the visual model relative to RigidBody origin (ground)
   speed: number;
   attackRange: number;
-  attackDamage?: number; // Optional: Damage dealt by this enemy type
+  minDamage?: number; // UPDATED (from attackDamage)
+  maxDamage?: number; // NEW
   modelPath?: string; // Optional GLTF path for specific types (like boss)
   attackDistanceThreshold?: number; // ADDED
   animation?: {                 // ADDED
@@ -31,7 +32,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 0.6,                  // Match hitboxOffsetY for testing
     speed: 2.0, 
     attackRange: 1.5,
-    attackDamage: 10,
+    minDamage: 10, // UPDATED
+    maxDamage: 10, // NEW
     attackDistanceThreshold: 1.8, // ADDED example value
     animation: {                  // ADDED example values
         walkSpeed: 3.0,
@@ -48,7 +50,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 1.8,                  // Reverted: Original visual offset
     speed: 1.8, 
     attackRange: 2.0,
-    attackDamage: 25,
+    minDamage: 30, // UPDATED
+    maxDamage: 50, // NEW
   },
   zombie_boss: { // Keeping Cuboid for boss for now, adjust if needed
     health: 1000,
@@ -59,7 +62,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 1.0, // Reverted: Original visual offset (Adjust if needed)
     speed: 2.0,
     attackRange: 2.5,
-    attackDamage: 40,
+    minDamage: 50,  // Placeholder UPDATED
+    maxDamage: 75, // Placeholder NEW
     modelPath: "/models/zombie_animated.glb", 
   },
   zombie_standard_bloody: { // Match standard shirt
@@ -71,7 +75,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 1.0,      // Reverted: Original visual offset
     speed: 2.0,
     attackRange: 1.5,
-    attackDamage: 10,
+    minDamage: 10, // UPDATED
+    maxDamage: 10, // NEW
   },
   // --- Placeholders (Revert to original visual offsets) --- 
   demon_lean: { 
@@ -83,7 +88,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 0.9, // Reverted: Original visual offset
     speed: 2.8,
     attackRange: 1.8,
-    attackDamage: 15,
+    minDamage: 15, // UPDATED
+    maxDamage: 15, // NEW
   },
    demon_skeletal_winged: { 
     health: 120,
@@ -94,7 +100,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 0.75, // Reverted: Original visual offset
     speed: 3.2,
     attackRange: 1.6,
-    attackDamage: 12,
+    minDamage: 12, // UPDATED
+    maxDamage: 12, // NEW
   },
    demon_brute: { 
     health: 350,
@@ -105,7 +112,8 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     visualYOffset: 1.25, // Reverted: Original visual offset
     speed: 1.5,
     attackRange: 2.2,
-    attackDamage: 30,
+    minDamage: 30, // UPDATED
+    maxDamage: 30, // NEW
   },
 };
 

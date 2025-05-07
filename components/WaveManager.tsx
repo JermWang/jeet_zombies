@@ -30,7 +30,13 @@ const WAVES: WaveConfig[] = [
     { zombieCount: 12, spawnDelay: 1000, types: [{ type: 'zombie_standard_shirt', weight: 5 }, { type: 'zombie_brute', weight: 1 }] }, 
     { zombieCount: 15, spawnDelay: 900, types: [{ type: 'zombie_standard_shirt', weight: 3 }, { type: 'zombie_brute', weight: 2 } ] },
     { zombieCount: 18, spawnDelay: 700, types: [{ type: 'zombie_standard_shirt', weight: 2 }, { type: 'zombie_brute', weight: 3 } ] },
-    { zombieCount: 25, spawnDelay: 500, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 1 } ] }
+    { zombieCount: 25, spawnDelay: 500, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 1 } ] },
+    // NEW Placeholder Waves 7-9
+    { zombieCount: 30, spawnDelay: 450, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 2 } ] }, // More brutes
+    { zombieCount: 35, spawnDelay: 400, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 3 } ] }, // Even more brutes
+    { zombieCount: 40, spawnDelay: 350, types: [{ type: 'zombie_brute', weight: 1 } ] }, // All brutes, fast spawn
+    // NEW Wave 10: Boss Wave
+    { zombieCount: 1, spawnDelay: 1000, types: [{ type: 'zombie_boss', weight: 1 }] } 
 ];
 
 // Spawn parameters (findSafeSpawnPoint in store might use its own constants)
@@ -65,6 +71,7 @@ const WaveManager = () => {
     const _setWaveActiveFromStore = useGameStore(state => state.setWaveActive);
     const _setWaveBetweenFromStore = useGameStore(state => state.setWaveBetween);
     const _findSafeSpawnPointFromStore = useGameStore(state => state.findSafeSpawnPoint);
+    const _setBossFightActiveFromStore = useGameStore(state => state.setBossFightActive);
     
     const _playWaveIncomingVO_fromHook = useSoundEffects(state => state.playWaveIncomingVO);
     const _playWaveClearedVO_fromHook = useSoundEffects(state => state.playWaveClearedVO);
@@ -77,6 +84,7 @@ const WaveManager = () => {
     const setWaveActiveRef = useRef(_setWaveActiveFromStore);
     const setWaveBetweenRef = useRef(_setWaveBetweenFromStore);
     const findSafeSpawnPointRef = useRef(_findSafeSpawnPointFromStore);
+    const setBossFightActiveRef = useRef(_setBossFightActiveFromStore);
 
     useEffect(() => { playWaveIncomingVORef.current = _playWaveIncomingVO_fromHook; }, [_playWaveIncomingVO_fromHook]);
     useEffect(() => { playWaveClearedVORef.current = _playWaveClearedVO_fromHook; }, [_playWaveClearedVO_fromHook]);
@@ -86,6 +94,7 @@ const WaveManager = () => {
     useEffect(() => { setWaveActiveRef.current = _setWaveActiveFromStore; }, [_setWaveActiveFromStore]);
     useEffect(() => { setWaveBetweenRef.current = _setWaveBetweenFromStore; }, [_setWaveBetweenFromStore]);
     useEffect(() => { findSafeSpawnPointRef.current = _findSafeSpawnPointFromStore; }, [_findSafeSpawnPointFromStore]);
+    useEffect(() => { setBossFightActiveRef.current = _setBossFightActiveFromStore; }, [_setBossFightActiveFromStore]);
 
     const spawnIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const initialDelayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -118,6 +127,10 @@ const WaveManager = () => {
                 const waveIndex = 0;
                 if (waveIndex < WAVES.length) {
                     console.log(`%c[WaveManager Initial Start] Timer finished. Triggering Spawning for Wave ${waveIndex + 1}.`, "color: green; font-weight: bold");
+                    if (waveIndex + 1 === 10) {
+                        console.log("%c[WaveManager] Initial wave is Wave 10 (Boss Wave). Activating boss fight.", "color: magenta; font-weight: bold;");
+                        setBossFightActiveRef.current(true);
+                    }
                     startWaveSpawningRef.current(waveIndex + 1, WAVES[waveIndex].zombieCount);
                     zombiesSpawnedThisWave.current = 0;
                 } else {
@@ -165,16 +178,17 @@ const WaveManager = () => {
                     if (spawnPos) {
                         const enemyType = selectZombieType(config.types);
                         const spawnedId = spawnEnemy(enemyType, spawnPos);
+                        console.log(`%c[WaveManager Spawning Attempt] Wave: ${currentWave}, Spawn #: ${spawnedCount + 1}/${config.zombieCount}, Type: ${enemyType}, Pos: ${JSON.stringify(spawnPos)}, Spawned ID: ${spawnedId}`, "color: #FFD700"); // Gold color for visibility
                         if (spawnedId !== null) {
                             spawnedCount++;
                             zombiesSpawnedThisWave.current = spawnedCount;
                         } else {
-                            console.warn("[WaveManager Spawning] spawnEnemy failed (pool full?), pausing spawn interval.");
+                            console.warn("[WaveManager Spawning] spawnEnemy returned null (pool full or other issue?). Pausing spawn interval for this wave.");
                             if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
-                            // No null setting here, allow potential resume or different handling
+                            // Do not set to null, might want to allow a resume or other handling for this wave
                         }
                     } else {
-                        console.error("[WaveManager Spawning] Could not find safe spawn position via store function (ref), stopping wave spawn.");
+                        console.error("[WaveManager Spawning] Could not find safe spawn position. Stopping wave spawn.");
                         if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
                         spawnIntervalRef.current = null;
                     }
@@ -234,6 +248,10 @@ const WaveManager = () => {
             nextWaveStartTimerRef.current = setTimeout(() => {
                  if (nextWaveIndex < WAVES.length) {
                     console.log(`%c[WaveManager Between] Timer finished. Triggering Spawning for Wave ${nextWaveNumber}.`, "color: purple; font-weight: bold");
+                    if (nextWaveNumber === 10) {
+                        console.log("%c[WaveManager] Next wave is Wave 10 (Boss Wave). Activating boss fight.", "color: magenta; font-weight: bold;");
+                        setBossFightActiveRef.current(true);
+                    }
                     startWaveSpawning(nextWaveNumber, WAVES[nextWaveIndex].zombieCount);
                     zombiesSpawnedThisWave.current = 0;
                 } else {

@@ -18,6 +18,8 @@ interface EnemyConfig {
   colliderType: 'capsule' | 'cuboid';
   speed: number;
   attackRange: number;
+  minDamage?: number; // NEW
+  maxDamage?: number; // NEW
   modelPath?: string;
 }
 
@@ -29,6 +31,8 @@ const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     colliderType: 'capsule',
     speed: 2.5,
     attackRange: 1.5,
+    minDamage: 10, // Current default
+    maxDamage: 10, // Current default
   },
   zombie_brute: {
     health: 250,
@@ -37,6 +41,8 @@ const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     colliderType: 'capsule',
     speed: 1.8,
     attackRange: 2.0,
+    minDamage: 30, // NEW Brute damage
+    maxDamage: 50, // NEW Brute damage
   },
   zombie_boss: {
     health: 1000,
@@ -45,6 +51,8 @@ const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     colliderType: 'capsule',
     speed: 2.0,
     attackRange: 2.5,
+    minDamage: 50,  // Placeholder boss damage
+    maxDamage: 75, // Placeholder boss damage
     modelPath: "/models/zombie_animated.glb",
   },
 }
@@ -58,6 +66,23 @@ export interface EnemyState {
   isDead: boolean; // If true, this enemy is inactive and available in the pool
   physicsBodyId: number | null; // Keep this if used by worker
   isHit?: boolean; // ADDED: Flag for hit flash visual
+}
+
+// NEW: Weapon Pickup State Interface
+export interface WeaponPickupState {
+  id: string; // Unique ID for each pickup instance
+  weaponId: string; // Type of weapon (e.g., 'shotgun')
+  position: [number, number, number]; // World position
+  collected: boolean;
+}
+
+// NEW: Ammo Pickup State Interface
+export interface AmmoPickupState {
+  id: string; // Unique ID for this pickup instance
+  type: string; // Type of ammo pack (e.g., 'standard_ammo_pack')
+  position: [number, number, number];
+  amount: number; // Amount of ammo this specific instance provides (can be from config)
+  collected: boolean;
 }
 
 interface GameState {
@@ -80,6 +105,15 @@ interface GameState {
   totalZombiesInWave: number; // NEW: Total zombies for the current wave
   waveStatus: 'Idle' | 'Spawning' | 'Active' | 'BetweenWaves';
 
+  // NEW: Weapon Pickups State
+  weaponPickups: WeaponPickupState[];
+
+  // NEW: Ammo Pickups State
+  ammoPickups: AmmoPickupState[];
+
+  // NEW: Boss Fight State
+  bossFightActive: boolean;
+
   findSafeSpawnPoint: (() => THREE.Vector3 | null) | null; // ADDED: Function holder
 
   decreaseHealth: (amount: number) => void
@@ -101,6 +135,17 @@ interface GameState {
   setWaveActive: () => void;
   setWaveBetween: () => void; // Action for starting the break
   setFindSafeSpawnPoint: (finder: (() => THREE.Vector3 | null) | null) => void; // ADDED: Action to set the function
+
+  // NEW: Weapon Pickup Actions
+  initializeWeaponPickups: (pickups: WeaponPickupState[]) => void;
+  collectWeaponPickup: (id: string) => void;
+
+  // NEW: Ammo Pickup Actions
+  initializeAmmoPickups: (pickups: AmmoPickupState[]) => void;
+  collectAmmoPickup: (id: string) => void;
+
+  // NEW: Boss Fight Actions
+  setBossFightActive: (isActive: boolean) => void;
 }
 
 // Timeout map to prevent duplicate flash resets
@@ -125,6 +170,18 @@ const useGameStore = createWithEqualityFn<GameState>(
     totalZombiesInWave: 0,
   waveStatus: 'Idle',
     findSafeSpawnPoint: null,
+
+  // NEW: Weapon Pickups State
+  weaponPickups: [], // NEW: Initialize weapon pickups array
+
+  // NEW: Ammo Pickups State
+  // ammoPickups: [], // DUPLICATE REMOVED
+
+  // NEW: Boss fight state init
+  bossFightActive: false,
+
+  // NEW: Ammo pickups state init
+  ammoPickups: [],
 
   decreaseHealth: (amount) =>
     set((state) => {
@@ -173,11 +230,9 @@ const useGameStore = createWithEqualityFn<GameState>(
       zombiesRemainingInWave: 0,
         totalZombiesInWave: 0,
       waveStatus: 'Idle',
+      bossFightActive: false, // Reset boss fight state
     });
     console.log(`Game started, enemy pool initialized. Wave status: Idle.`);
-    const bossSpawnPos = new Vector3Impl(0, -0.04, -10); 
-    console.log("Attempting to spawn initial boss...");
-      get().spawnEnemy('zombie_boss', bossSpawnPos);
   },
 
   resetGame: () => {
@@ -207,6 +262,9 @@ const useGameStore = createWithEqualityFn<GameState>(
       waveStatus: 'Idle',
       findSafeSpawnPoint: null, // Reset this if it was set during gameplay
       isPlayerHit: false,       // Reset player hit state
+      weaponPickups: get().weaponPickups.map(wp => ({ ...wp, collected: false })), // Reset collected state for all pickups
+      ammoPickups: get().ammoPickups.map(ap => ({ ...ap, collected: false })), // NEW: Reset ammo pickups
+      bossFightActive: false, // Reset boss fight state
     });
      console.log(`Game reset, returning to main menu. Wave status: Idle.`);
   },
@@ -384,6 +442,28 @@ const useGameStore = createWithEqualityFn<GameState>(
   setFindSafeSpawnPoint: (finder) => {
     set({ findSafeSpawnPoint: finder });
   },
+
+  // NEW: Weapon Pickup Actions
+  initializeWeaponPickups: (pickups) => set({ weaponPickups: pickups }),
+  collectWeaponPickup: (id) =>
+    set((state) => ({
+      weaponPickups: state.weaponPickups.map((pickup) =>
+        pickup.id === id ? { ...pickup, collected: true } : pickup
+      ),
+    })),
+
+  // NEW: Ammo Pickup Actions
+  initializeAmmoPickups: (pickups) => set({ ammoPickups: pickups }),
+  collectAmmoPickup: (id) =>
+    set((state) => ({
+      ammoPickups: state.ammoPickups.map((pickup) =>
+        pickup.id === id ? { ...pickup, collected: true } : pickup
+      ),
+    })),
+
+  // NEW: Boss Fight Action Implementation
+  setBossFightActive: (isActive) => set({ bossFightActive: isActive }),
+
   }),
   shallow // Default equality function
 );

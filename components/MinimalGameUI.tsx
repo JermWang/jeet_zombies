@@ -82,14 +82,17 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
         <div className="absolute inset-0 bg-red-700 opacity-30 z-50"></div>
       )}
 
-      <div className="absolute top-4 right-4 pointer-events-auto z-10">
-        <button
-          onClick={toggleDebugMode}
-          className="px-3 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
-        >
-          Toggle Debug ({isDebugMode ? "On" : "Off"})
-        </button>
-      </div>
+      {/* Conditionally render Debug Toggle Button */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="absolute top-4 right-4 pointer-events-auto z-10">
+          <button
+            onClick={toggleDebugMode}
+            className="px-3 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+          >
+            Toggle Debug ({isDebugMode ? "On" : "Off"})
+          </button>
+        </div>
+      )}
 
       {/* Health Bar - Repositioned and Restyled */}
       {gameStarted && !isGameOver && ( // Only show if game started and not game over

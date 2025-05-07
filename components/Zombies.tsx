@@ -180,7 +180,16 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
             const currentTime = state.clock.elapsedTime;
             if (currentTime - lastAttackTimeRef.current > DEFAULT_ATTACK_COOLDOWN) {
                 console.log(`%c[ActiveZombie ATTACK] ID: ${id} attacking player! Distance: ${distanceToPlayer.toFixed(2)}, Range: ${attackRange}`, "color: red; font-weight: bold;");
-                decreaseHealth(DEFAULT_ATTACK_DAMAGE);
+                
+                // Calculate damage based on config
+                let actualDamage = DEFAULT_ATTACK_DAMAGE;
+                if (config.minDamage !== undefined && config.maxDamage !== undefined) {
+                    actualDamage = Math.floor(Math.random() * (config.maxDamage - config.minDamage + 1)) + config.minDamage;
+                } else if (config.minDamage !== undefined) { // If only minDamage is defined, use it as fixed damage
+                    actualDamage = config.minDamage;
+                }
+                console.log(`%c[ActiveZombie ATTACK] ID: ${id} dealing ${actualDamage} damage. Config Min: ${config.minDamage}, Config Max: ${config.maxDamage}`, "color: red; font-weight: bold;");
+                decreaseHealth(actualDamage);
                 playZombieBiteSound(); // NEW: Play bite sound
                 lastAttackTimeRef.current = currentTime;
                 // TODO: Trigger attack animation via state or direct action call if model supports it

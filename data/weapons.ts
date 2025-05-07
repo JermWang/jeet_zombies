@@ -39,7 +39,7 @@ const weapons: Record<string, WeaponData> = {
     recoil: 0.3,
     spread: 0.05,
     automatic: false,
-    bulletSpeed: 30,
+    bulletSpeed: 60,
     bulletLifetime: 2,
     model: {
       scale: 1,
@@ -65,7 +65,7 @@ const weapons: Record<string, WeaponData> = {
     recoil: 0.8,
     spread: 0.2,
     automatic: false,
-    bulletSpeed: 25,
+    bulletSpeed: 50,
     bulletLifetime: 1,
     model: {
       scale: 1.2,
@@ -91,7 +91,7 @@ const weapons: Record<string, WeaponData> = {
     recoil: 0.4,
     spread: 0.1,
     automatic: true,
-    bulletSpeed: 35,
+    bulletSpeed: 70,
     bulletLifetime: 1.5,
     model: {
       scale: 0.9,
@@ -117,7 +117,7 @@ const weapons: Record<string, WeaponData> = {
     recoil: 0.5,
     spread: 0.03,
     automatic: true,
-    bulletSpeed: 40,
+    bulletSpeed: 80,
     bulletLifetime: 2.5,
     model: {
       scale: 1.1,

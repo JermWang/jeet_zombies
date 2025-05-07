@@ -10,6 +10,7 @@ const keyMap = {
   right: ["ArrowRight", "d", "D"],
   jump: [" ", "Space"], // Space key for jumping only
   sprint: ["Shift"], // Shift key for sprinting
+  interact: ["e", "E"], // NEW: Interact key
 }
 
 export default function useKeyboardControls() {
@@ -21,6 +22,7 @@ export default function useKeyboardControls() {
     jump: false,
     shoot: false,
     sprint: false,
+    interact: false, // NEW: Interact state
   })
 
   useEffect(() => {

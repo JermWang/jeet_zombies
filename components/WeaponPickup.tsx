@@ -9,8 +9,10 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { GROUP_PLAYER, GROUP_PICKUP } from '@/lib/physicsConstants'; // Import constants
 import weapons from '@/data/weapons'; // To get model scale
 import { useRapier } from '@react-three/rapier'; // Import useRapier
+import useGameStore from '@/hooks/useGameStore';
 
 interface WeaponPickupProps {
+  id: string;
   weaponId: string;
   position: [number, number, number];
 }
@@ -71,11 +73,12 @@ const pickupCollisions = interactionGroups(
     1 << GROUP_PLAYER   // Interacts ONLY with Player group
 );
 
-export default function WeaponPickup({ weaponId, position }: WeaponPickupProps) {
+export default function WeaponPickup({ id, weaponId, position }: WeaponPickupProps) {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<any>(null); // ADD ref for the collider
-  const [isVisible, setIsVisible] = useState(true);
   const { addWeapon } = useWeaponStore();
+  const weaponPickupState = useGameStore((state) => state.weaponPickups.find(p => p.id === id)); // Get state from store
+  const isVisible = weaponPickupState ? !weaponPickupState.collected : true; // Determine visibility
   const rapier = useRapier(); // Get rapier context
   const groupRef = useRef<THREE.Group>(null); // ADD ref for the visual group
   // TODO: Add a generic item pickup sound effect
@@ -83,21 +86,6 @@ export default function WeaponPickup({ weaponId, position }: WeaponPickupProps) 
 
   const weaponConfig = weapons[weaponId];
   const modelScale = weaponConfig?.model?.scale || 1;
-
-  const handleIntersection = useCallback((event: any) => {
-    // Check if the intersecting object is the player
-    // Note: We need to add userData type='player' to the Player collider
-    if (event.collider.parent()?.userData?.type === 'player') {
-      console.log(`Player picked up ${weaponId}`);
-      addWeapon(weaponId);
-      // playItemPickupSound(); // Play sound when added
-      setIsVisible(false); // Hide visual
-      // Disable physics body
-      if (rigidBodyRef.current) {
-        rigidBodyRef.current.setEnabled(false);
-      }
-    }
-  }, [weaponId, addWeapon]);
 
   // --- Add useFrame for slow rotation --- 
   useFrame((_state, delta) => {
@@ -120,14 +108,13 @@ export default function WeaponPickup({ weaponId, position }: WeaponPickupProps) 
       type="fixed" // Pickups don't move
       colliders={false} // Manual collider
       position={position}
-      userData={{ type: 'pickup', weaponId: weaponId }} // Identify as pickup
+      userData={{ type: 'pickup', weaponId: weaponId, pickupInstanceId: id }} // Store instanceId in userData
     >
       <CuboidCollider
         ref={colliderRef} // ADD ref prop
         args={colliderArgs} 
         sensor // Make it a sensor so player passes through
         collisionGroups={pickupCollisions}
-        onIntersectionEnter={handleIntersection}
       />
       <group 
         ref={groupRef} // Attach ref

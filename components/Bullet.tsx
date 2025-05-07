@@ -172,11 +172,11 @@ export function Bullet({ id, initialPosition, initialDirection, weaponId, damage
       />
       <mesh castShadow={false} receiveShadow={false}>
         <sphereGeometry args={[0.05, 8, 8]} />
-        <meshStandardMaterial color="red" emissive="red" emissiveIntensity={2} toneMapped={false} />
+        <meshStandardMaterial color="green" emissive="lime" emissiveIntensity={3} toneMapped={false} />
         {/* Optional Trail */}
         <Trail
           width={0.05}
-          color={"orange"}
+          color={"limegreen"}
           length={5}
           decay={2}
           local={false}

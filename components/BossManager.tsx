@@ -5,16 +5,29 @@ import useGameStore from '@/hooks/useGameStore';
 import IndividualBoss from './IndividualBoss'; // We'll create this next
 
 export default function BossManager() {
-    const boss = useGameStore((state) => state.enemies[0]); // Assuming boss is always ID 0
+    const bossFightActive = useGameStore((state) => state.bossFightActive);
+    const enemies = useGameStore((state) => state.enemies);
 
-    if (!boss || boss.isDead) {
-        return null; // Don't render if boss doesn't exist or is dead
+    if (!bossFightActive) {
+        return null; // Don't render if boss fight is not active
     }
 
+    // Find the active boss in the enemies array
+    const activeBoss = enemies.find(enemy => enemy.type === 'zombie_boss' && !enemy.isDead);
+
+    if (!activeBoss) {
+        console.log("[BossManager] Boss fight active, but no living boss found in enemy pool.");
+        return null; // No living boss found
+    }
+
+    console.log(`[BossManager] Rendering IndividualBoss for ID: ${activeBoss.id}`);
     return (
         <>
-            {/* Commenting out IndividualBoss to test floor zombie visual */}
-            {/* <IndividualBoss id={boss.id} initialPosition={boss.position} /> */}
+            <IndividualBoss 
+                id={activeBoss.id} 
+                initialPosition={activeBoss.position} 
+                type={activeBoss.type} 
+            />
         </>
     );
 } 

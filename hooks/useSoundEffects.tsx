@@ -31,6 +31,9 @@ interface SoundEffectsState {
   transitionBuffer: Howl | null
   outtaControlVOBuffer: Howl | null
 
+  // NEW: Item Pickup sound
+  itemPickupBuffer: Howl | null;
+
   // --- Add Wave VO Buffers ---
   waveClearedVOBuffer: Howl | null;
   waveIncomingVOBuffer: Howl | null;
@@ -62,6 +65,9 @@ interface SoundEffectsState {
   // NEW: Game Over sound playback functions
   playTransitionSound: () => void
   playOuttaControlSound: () => void
+
+  // NEW: Item Pickup sound playback function
+  playItemPickupSound: () => void;
 
   // --- Add Wave VO Functions ---
   playWaveClearedVO: () => void;
@@ -110,6 +116,9 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   // NEW: Game Over sounds
   transitionBuffer: null,
   outtaControlVOBuffer: null,
+
+  // NEW: Item Pickup sound
+  itemPickupBuffer: null,
 
   // --- Initialize Wave VO Buffers ---
   waveClearedVOBuffer: null,
@@ -170,8 +179,10 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
       { key: "ambientMusicBuffer", path: soundPaths.ambientMusic, loop: true, volume: 0.25 },
       { key: "batBuffer", path: soundPaths.bats, volume: 0.6 },
       // NEW: Game Over sounds
-      { key: "transitionBuffer", path: soundPaths.transition, volume: 0.7 },
+      { key: "transitionBuffer", path: soundPaths.gameOverTransition, volume: 0.7 },
       { key: "outtaControlVOBuffer", path: soundPaths.outtaControlVO, volume: 1.0 },
+      // NEW: Item Pickup sound
+      { key: "itemPickupBuffer", path: soundPaths.weaponSwitch, volume: 0.6 }, // Using weaponSwitch as placeholder
       // --- Add VO Sound Definitions ---
       // Using actual filenames found earlier. Assumes soundPaths object will have corresponding keys.
       { key: "waveClearedVOBuffer", path: soundPaths.waveClearedVO, volume: 1.0 }, // e.g., '/sounds/AI VOICE/holy shit thats alot.mp3'
@@ -229,7 +240,16 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
 
   // NEW: Game Over sound playback
   playTransitionSound: () => get().transitionBuffer?.play(),
-  playOuttaControlSound: () => get().outtaControlVOBuffer?.play(),
+  playOuttaControlSound: () => {
+    const buffer = get().outtaControlVOBuffer;
+    console.log("[SoundEffects] Attempting to play outtaControlVO. Buffer exists:", !!buffer);
+    buffer?.play();
+  },
+
+  // NEW: Implement Item Pickup Sound Playback
+  playItemPickupSound: () => {
+    get().itemPickupBuffer?.play();
+  },
 
   // Play ambient map noise only if the interval has passed
   playAmbientMapNoiseSound: () => {
@@ -364,8 +384,8 @@ export const useInitializeSounds = () => {
         countdown3VO: '/sounds/AI VOICE/three two one.mp3',
         // countdown2VO: '/sounds/AI VOICE/countdown_2.mp3', // Add path if you have separate file
         // countdown1VO: '/sounds/AI VOICE/countdown_1.mp3', // Add path if you have separate file
-        transition: '/sounds/transition.mp3',
-        outtaControlVO: '/sounds/outtaControl.mp3',
+        gameOverTransition: '/sounds/transition.mp3',
+        outtaControlVO: '/sounds/AI VOICE/outta_control.mp3',
       };
 
       loadSounds(soundPaths);

@@ -16,6 +16,42 @@ import {
     GROUP_BULLET 
 } from "@/lib/physicsConstants"
 
+// NEW: Interface for Pickup UserData
+interface PickupUserData {
+    type: 'pickup';
+    weaponId: string;
+    pickupInstanceId: string;
+}
+
+// NEW: Type guard for PickupUserData
+function isPickupUserData(userData: any): userData is PickupUserData {
+    return (
+        userData &&
+        typeof userData === 'object' &&
+        userData.type === 'pickup' &&
+        typeof userData.weaponId === 'string' &&
+        typeof userData.pickupInstanceId === 'string'
+    );
+}
+
+// NEW: Interface for Ammo Pickup UserData
+interface AmmoPickupUserData {
+    type: 'ammoPickup';
+    pickupInstanceId: string;
+    amount: number;
+}
+
+// NEW: Type guard for AmmoPickupUserData
+function isAmmoPickupUserData(userData: any): userData is AmmoPickupUserData {
+    return (
+        userData &&
+        typeof userData === 'object' &&
+        userData.type === 'ammoPickup' &&
+        typeof userData.pickupInstanceId === 'string' &&
+        typeof userData.amount === 'number'
+    );
+}
+
 // Define muzzle flash state type
 interface MuzzleFlashState {
   visible: boolean;
@@ -54,21 +90,30 @@ export default function Player() {
     decreaseHealth, 
     setPlayerPosition, 
     setCameraAngle, 
-    damageEnemy // Include damageEnemy if it might be uncommented later
+    damageEnemy,
+    collectWeaponPickup,
+    collectAmmoPickup,
+    weaponPickups,
+    ammoPickups,
   } = useGameStore(state => ({
     isGameOver: state.isGameOver,
     health: state.health,
     decreaseHealth: state.decreaseHealth,
     setPlayerPosition: state.setPlayerPosition,
     setCameraAngle: state.setCameraAngle,
-    damageEnemy: state.damageEnemy, 
+    damageEnemy: state.damageEnemy,
+    collectWeaponPickup: state.collectWeaponPickup,
+    collectAmmoPickup: state.collectAmmoPickup,
+    weaponPickups: state.weaponPickups,
+    ammoPickups: state.ammoPickups,
   }));
   const { 
     playPistolSound, playShotgunSound, playSmgSound, playRifleSound,
     playWeaponSwitchSound, playJumpSound, playLandSound, playZombieBiteSound,
     playAmbientMapNoiseSound, playZombieAmbientSound,
     ambientMapNoiseBuffer, ambientMusicBuffer,
-    playAmbientMusic, audioContextStarted
+    playAmbientMusic, audioContextStarted,
+    playItemPickupSound,
   } = useSoundEffects(state => ({ 
       playPistolSound: state.playPistolSound,
       playShotgunSound: state.playShotgunSound,
@@ -83,7 +128,8 @@ export default function Player() {
       ambientMapNoiseBuffer: state.ambientMapNoiseBuffer,
       ambientMusicBuffer: state.ambientMusicBuffer,
       playAmbientMusic: state.playAmbientMusic,
-      audioContextStarted: state.audioContextStarted
+      audioContextStarted: state.audioContextStarted,
+      playItemPickupSound: state.playItemPickupSound,
   }))
   const {
     currentWeapon,
@@ -93,6 +139,8 @@ export default function Player() {
     availableWeapons,
     shoot,
     lastShotTime: storeLastShotTime,
+    addWeapon: addWeaponToStore,
+    refuelAllWeapons,
   } = useWeaponStore()
 
   // Player state
@@ -102,6 +150,9 @@ export default function Player() {
   const [weaponSwitchAnimation, setWeaponSwitchAnimation] = useState(0)
   const [breathingAnim, setBreathingAnim] = useState(0)
   const [lastShootTime, setLastShootTime] = useState(0)
+  const lastInteractTime = useRef(0); // CORRECTED: Use ref for cooldown timer
+  const INTERACT_COOLDOWN = 300
+  const PICKUP_RADIUS = 2.5; // NEW: Radius for proximity pickup
   const [muzzleFlash, setMuzzleFlash] = useState<MuzzleFlashState>({ // Muzzle Flash state
     visible: false,
     intensity: 0,
@@ -145,7 +196,6 @@ export default function Player() {
   const JUMP_FORCE = 6
   const GRAVITY = -9.81
   const MOVEMENT_STOP_THRESHOLD = 200
-  const SHOOT_COOLDOWN = 100
 
   // Character colors - Based on the reference image
   const BODY_COLOR = "#cc0000"
@@ -353,19 +403,20 @@ export default function Player() {
   // Define handleShoot simply (no useCallback)
   const handleShoot = useCallback(() => { 
     const world = rapier.world; 
-    const rapierInstance = rapier.rapier; // Keep this line
+    const rapierInstance = rapier.rapier;
     if (!world || !rapierInstance || !playerRef.current) return false;
 
     if (isGameOver || !currentWeapon || isReloading) return false
 
-    const now = performance.now()
-    if (now - lastShootTime < SHOOT_COOLDOWN) {
-      console.log("Shoot cooldown active");
-      return false
-    }
-
     const weaponData = weapons[currentWeapon]
     if (!weaponData) return false
+
+    const dynamicShootCooldown = 1000 / weaponData.fireRate; // Calculate cooldown from fireRate
+    const now = performance.now()
+    if (now - lastShootTime < dynamicShootCooldown) { // Use dynamic cooldown
+      // console.log("Shoot cooldown active"); // Can be too noisy for auto weapons
+      return false
+    }
 
     const shotSuccessful = shoot();
     if (!shotSuccessful) {
@@ -418,9 +469,12 @@ export default function Player() {
 
       // Check if the hit collider belongs to an enemy
       const hitCollider = hitData.collider;
-      const hitBody = hitCollider.parent(); // Get the RigidBody
-      if (hitBody && typeof hitBody.userData === 'object' && hitBody.userData !== null && 'type' in hitBody.userData && hitBody.userData.type === 'enemy' && 'id' in hitBody.userData) {
-        hitEnemyId = hitBody.userData.id as number; // Get the enemy ID
+      const hitBody = hitCollider.parent();
+      const userData = hitBody?.userData;
+      console.log("[Player Shoot Raycast] Hit Body UserData:", userData); // More appropriate log for shooting
+      
+      if (userData && typeof userData === 'object' && userData !== null && 'type' in userData && userData.type === 'enemy' && 'id' in userData) {
+        hitEnemyId = userData.id as number; // Get the enemy ID
         console.log(`Bullet hit enemy ID: ${hitEnemyId}`);
         // Call game store function to damage enemy
         // *** REMOVE THE DAMAGE CALL FROM HERE ***
@@ -440,12 +494,15 @@ export default function Player() {
     const muzzleOffset = 0.5; // Offset distance from gun center along forward direction
     const muzzlePosition = gunPosition.clone().add(cameraForwardDirection.multiplyScalar(muzzleOffset));
 
+    // --- Calculate corrected direction for the bullet visual ---
+    const correctedBulletDirection = new THREE.Vector3().subVectors(targetPoint, muzzlePosition).normalize();
+
     // Dispatch event (keep original)
-    console.log("Dispatching playerShoot event", { position: muzzlePosition.toArray(), direction: rayDirection.toArray(), weapon: currentWeapon, damage: weaponData.damage, hitEnemyId: hitEnemyId })
+    console.log("Dispatching playerShoot event", { position: muzzlePosition.toArray(), direction: correctedBulletDirection.toArray(), weapon: currentWeapon, damage: weaponData.damage, hitEnemyId: hitEnemyId })
     const shootEvent = new CustomEvent("playerShoot", {
       detail: {
             position: muzzlePosition,
-            direction: rayDirection,
+            direction: correctedBulletDirection, // USE CORRECTED DIRECTION
         weaponId: currentWeapon,
             damage: weaponData.damage,
             hitEnemyId: hitEnemyId
@@ -456,7 +513,7 @@ export default function Player() {
     return true; // Revert return
   }, [ 
     rapier.world, rapier.rapier,
-    isGameOver, currentWeapon, isReloading, lastShootTime, SHOOT_COOLDOWN, shoot,
+    isGameOver, currentWeapon, isReloading, lastShootTime, shoot,
     playPistolSound, playShotgunSound, playSmgSound, playRifleSound, 
     triggerRecoil, triggerMuzzleFlash, camera.quaternion, camera.position,
     playerRef, gunRef, damageEnemy // Add refs used for position fallback/calculation
@@ -465,17 +522,21 @@ export default function Player() {
   // useEffect for mousedown listener (calls the regular handleShoot function)
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
-      console.log("Mouse down event detected", { button: e.button, mouseLookEnabled, isGameOver });
+      // console.log("Mouse down event detected", { button: e.button, mouseLookEnabled, isGameOver });
       if (e.button === 0 && mouseLookEnabled && !isGameOver) { 
-        console.log("Calling handleShoot()...");
-        handleShoot(); 
+        // For non-automatic weapons, or the first shot of an automatic weapon
+        const weaponData = currentWeapon ? weapons[currentWeapon] : null;
+        if (!weaponData || !weaponData.automatic) {
+            // console.log("Calling handleShoot() for single fire or first auto shot...");
+            handleShoot(); 
+        }
       }
     }
     window.addEventListener("mousedown", handleMouseDown)
     return () => {
       window.removeEventListener("mousedown", handleMouseDown)
     }
-  }, [isGameOver, mouseLookEnabled, handleShoot])
+  }, [isGameOver, mouseLookEnabled, handleShoot, currentWeapon]); // NEW: Added currentWeapon
 
   const handleCollision = (event: any) => {
     if (!isGameOver && health > 0) {
@@ -559,6 +620,73 @@ export default function Player() {
         document.exitPointerLock();
       }
       return; // Skip all other player logic
+    }
+
+    const now = Date.now();
+
+    // Interaction (E key)
+    if (keys.interact && playerRef.current) {
+      // console.log("[Player Interact Attempt] E pressed, keys.interact:", keys.interact); // DEBUG
+      if (now - lastInteractTime.current > INTERACT_COOLDOWN) {
+        // console.log("[Player Interact] Cooldown passed, attempting proximity check."); // DEBUG
+        lastInteractTime.current = now;
+
+        const playerPositionVec = playerRef.current.translation();
+        const playerPos = new THREE.Vector3(playerPositionVec.x, playerPositionVec.y, playerPositionVec.z);
+
+        let closestItem: { id: string; distance: number; type: 'weapon' | 'ammo' } | null = null;
+
+        // Check weapon pickups
+        weaponPickups.forEach(pickup => {
+          if (!pickup.collected) {
+            const pickupPos = new THREE.Vector3(...pickup.position);
+            const distance = playerPos.distanceTo(pickupPos);
+            if (distance < PICKUP_RADIUS) {
+              if (!closestItem || distance < closestItem.distance) {
+                closestItem = { id: pickup.id, distance, type: 'weapon' };
+              }
+            }
+          }
+        });
+
+        // Check ammo pickups
+        ammoPickups.forEach(pickup => {
+          if (!pickup.collected) {
+            const pickupPos = new THREE.Vector3(...pickup.position);
+            const distance = playerPos.distanceTo(pickupPos);
+            if (distance < PICKUP_RADIUS) {
+              if (!closestItem || distance < closestItem.distance) {
+                closestItem = { id: pickup.id, distance, type: 'ammo' };
+              }
+            }
+          }
+        });
+
+        if (closestItem) {
+          const currentClosestItem = closestItem as { id: string; distance: number; type: 'weapon' | 'ammo' }; // Intermediate constant for clearer type inference
+          // console.log(`[Player Interact] Found closest item: ${currentClosestItem.type} ID: ${currentClosestItem.id} at distance: ${currentClosestItem.distance}`); // DEBUG
+          if (currentClosestItem.type === 'weapon') {
+            collectWeaponPickup(currentClosestItem.id);
+            const weapon = weaponPickups.find(wp => wp.id === currentClosestItem.id); // Use currentClosestItem
+            if (weapon) {
+                console.log(`[Player Action] Picked up weapon: ${weapon.weaponId}`);
+                addWeaponToStore(weapon.weaponId); // Also add to weapon store if not already present
+                setCurrentWeapon(weapon.weaponId); // Switch to the new weapon
+                playItemPickupSound();
+            }
+          } else if (currentClosestItem.type === 'ammo') {
+            collectAmmoPickup(currentClosestItem.id);
+            const ammo = ammoPickups.find(ap => ap.id === currentClosestItem.id); // Use currentClosestItem
+            if (ammo) {
+                console.log(`[Player Action] Picked up ammo: ${ammo.type}, Amount: ${ammo.amount}`);
+                refuelAllWeapons(ammo.amount); // Example: refuel current weapon, or all by specific type
+                playItemPickupSound();
+            }
+          }
+        } else {
+          // console.log("[Player Interact] No items in pickup radius."); // DEBUG
+        }
+      }
     }
 
     animationTime.current += delta
@@ -978,19 +1106,19 @@ export default function Player() {
             )}
 
             {currentWeapon === "shotgun" && (
-              <>
-                  <mesh castShadow receiveShadow material={weaponMaterial}>
+              <group position={[0, 0, 0.1]}>
+                <mesh castShadow receiveShadow material={weaponMaterial}>
                   <boxGeometry args={[0.15, 0.15, 0.8]} />
                 </mesh>
 
-                  <mesh castShadow position={[0, 0, 0.5]} material={weaponAccentMaterial}>
+                <mesh castShadow position={[0, 0, 0.5]} material={weaponAccentMaterial}>
                   <boxGeometry args={[0.15, 0.15, 0.4]} />
                 </mesh>
 
-                  <mesh castShadow position={[0, -0.1, -0.3]} rotation={[0.2, 0, 0]} material={weaponMaterial}>
+                <mesh castShadow position={[0, -0.1, -0.3]} rotation={[0.2, 0, 0]} material={weaponMaterial}>
                   <boxGeometry args={[0.12, 0.2, 0.3]} />
                 </mesh>
-              </>
+              </group>
             )}
 
             {currentWeapon === "smg" && (

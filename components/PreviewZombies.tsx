@@ -7,19 +7,17 @@ import { Howl } from 'howler';
 import StandardZombieModel from './StandardZombieModel';
 
 const ZOMBIE_COUNT = 23;
-const SPAWN_AREA_WIDTH = 80;
-const SPAWN_AREA_DEPTH = 60;
+const SPAWN_AREA_WIDTH = 200;
+const SPAWN_AREA_DEPTH = 200;
 const MOVEMENT_SPEED = 1.5;
 const Y_OFFSET = 0.9;
 
 // Placeholder sound files - replace with your actual file paths
 const ZOMBIE_SOUNDS = [
-  '/sounds/zombie_groan1.mp3',
-  '/sounds/zombie_groan2.mp3',
-  '/sounds/zombie_moan1.mp3',
+  '/sounds/zombieAmbient.mp3',
 ];
-const MIN_SOUND_INTERVAL = 3000; // 3 seconds
-const MAX_SOUND_INTERVAL = 7000; // 7 seconds
+const MIN_SOUND_INTERVAL = 10000;
+const MAX_SOUND_INTERVAL = 30000;
 
 const animateZombieLegs = (
   leftLeg: THREE.Mesh | null,
@@ -54,7 +52,7 @@ const PreviewZombies = () => {
         position: new THREE.Vector3(
           (Math.random() - 0.5) * SPAWN_AREA_WIDTH,
           Y_OFFSET,
-          (Math.random() - 0.5) * SPAWN_AREA_DEPTH - SPAWN_AREA_DEPTH / 2
+          (Math.random() - 0.5) * SPAWN_AREA_DEPTH
         ),
         movementAngle: Math.random() * Math.PI * 2,
       });
