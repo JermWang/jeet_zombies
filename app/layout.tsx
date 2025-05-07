@@ -21,7 +21,6 @@ const vt323 = VT323({
 export const metadata = {
   title: "JEET ZOMBIES",
   description: "HOLY SHIT! thats alotta jeets!",
-  generator: 'v0.dev',
   metadataBase: new URL('https://jeetzombies.xyz'),
   openGraph: {
     title: "JEET ZOMBIES",
