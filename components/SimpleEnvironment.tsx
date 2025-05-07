@@ -228,46 +228,40 @@ export default function SimpleEnvironment() {
           <CuboidCollider 
             args={i < 2 ? [0.5, 7.5, 150] : [150, 7.5, 0.5]} // Full length for 300x300 area
           />
-          {process.env.NODE_ENV === 'development' && (
-            <group>
-              {(() => {
-                const slats = [];
-                const fenceLength = 300;
-                const slatThickness = 0.2;
-                const gapSize = 0.8;
-                const slatPlusGap = slatThickness + gapSize; // Should be 1.0
-                const numberOfSlats = Math.floor(fenceLength / slatPlusGap);
-                const slatHeight = 15;
-                const fenceVisualThickness = 1;
+          <group>
+            {(() => {
+              const slats = [];
+              const fenceLength = 300;
+              const slatThickness = 0.2;
+              const gapSize = 0.8;
+              const slatPlusGap = slatThickness + gapSize; // Should be 1.0
+              const numberOfSlats = Math.floor(fenceLength / slatPlusGap);
+              const slatHeight = 15;
+              const fenceVisualThickness = 1;
 
-                for (let j = 0; j < numberOfSlats; j++) {
-                  // Calculate position of each slat along the length of the fence segment
-                  // The main RigidBody is already positioned at the center of the fence line.
-                  // So, slats are positioned relative to this center, from -fenceLength/2 to +fenceLength/2.
-                  const slatPositionOffset = -fenceLength / 2 + slatThickness / 2 + j * slatPlusGap;
-                  
-                  slats.push(
-                    <mesh 
-                      key={`slat-${i}-${j}`} 
-                      castShadow 
-                      receiveShadow
-                      // Position depends on whether it's an X-axis or Z-axis fence
-                      position={i < 2 ? [0, 0, slatPositionOffset] : [slatPositionOffset, 0, 0]}
-                    >
-                      <boxGeometry 
-                        args={i < 2 
-                          ? [fenceVisualThickness, slatHeight, slatThickness] // X-axis fence: thickness, height, slat_width
-                          : [slatThickness, slatHeight, fenceVisualThickness] // Z-axis fence: slat_width, height, thickness
-                        }
-                      />
-                      <meshStandardMaterial color="#222222" emissive="#111111" flatShading={true} />
-                    </mesh>
-                  );
-                }
-                return slats;
-              })()}
-            </group>
-          )}
+              for (let j = 0; j < numberOfSlats; j++) {
+                const slatPositionOffset = -fenceLength / 2 + slatThickness / 2 + j * slatPlusGap;
+                
+                slats.push(
+                  <mesh 
+                    key={`slat-${i}-${j}`} 
+                    castShadow 
+                    receiveShadow
+                    position={i < 2 ? [0, 0, slatPositionOffset] : [slatPositionOffset, 0, 0]}
+                  >
+                    <boxGeometry 
+                      args={i < 2 
+                        ? [fenceVisualThickness, slatHeight, slatThickness] 
+                        : [slatThickness, slatHeight, fenceVisualThickness] 
+                      }
+                    />
+                    <meshStandardMaterial color="#222222" emissive="#111111" flatShading={true} />
+                  </mesh>
+                );
+              }
+              return slats;
+            })()}
+          </group>
         </RigidBody>
       ))}
     </>
