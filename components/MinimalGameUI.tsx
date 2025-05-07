@@ -67,7 +67,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   }, [waveStatus, currentWave, gameStarted]);
 
   const handleCopy = () => {
-    const contractAddress = "YOUR_PLACEHOLDER_SOLANA_ADDRESS";
+    const contractAddress = "T9QWGnGAHVWonWR9db5Pw1KZnyG2zaeskdDAutL6GFM";
     navigator.clipboard.writeText(contractAddress).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -215,7 +215,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
             <p className="text-white font-pixel-alt text-base">Exclusively on GFM</p> 
             <div className="flex items-center space-x-2 mt-1"> 
               <span className="text-gray-400 font-mono text-xs break-all">
-                YOUR_PLACEHOLDER_SOLANA_ADDRESS 
+                T9QWGnGAHVWonWR9db5Pw1KZnyG2zaeskdDAutL6GFM
               </span>
               <Button
                 onClick={handleCopy}
