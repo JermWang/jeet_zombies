@@ -30,6 +30,9 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   const [waveMessage, setWaveMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Define the contract address as a constant
+  const CONTRACT_ADDRESS = "GUGmP1mbeNqYW5hU2XNjTj1xqMxPddxscnNeXB7Zbonk";
+
   useEffect(() => {
     if (isPlayerHit) {
       const timer = setTimeout(() => {
@@ -67,8 +70,8 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   }, [waveStatus, currentWave, gameStarted]);
 
   const handleCopy = () => {
-    const contractAddress = "GUGmP1mbeNqYW5hU2XNjTj1xqMxPddxscnNeXB7Zbonk";
-    navigator.clipboard.writeText(contractAddress).then(() => {
+    // Use the constant
+    navigator.clipboard.writeText(CONTRACT_ADDRESS).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(err => {
@@ -233,8 +236,9 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               <p className="text-white font-pixel-alt text-base">Exclusively on Bonk.Fun</p> 
             </div>
             <div className="flex items-center space-x-2 mt-1"> 
+              {/* Use the constant for display */}
               <span className="text-gray-400 font-mono text-xs break-all">
-                rKzH4ZqgqLSRygvFdrcTNg2cEVSCWSkmDcYJpAvGGFM
+                {CONTRACT_ADDRESS}
               </span>
               <Button
                 onClick={handleCopy}
