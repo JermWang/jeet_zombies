@@ -32,7 +32,7 @@ const weapons: Record<string, WeaponData> = {
     id: "pistol",
     name: "PISTOL",
     damage: 25,
-    fireRate: 2,
+    fireRate: 20,
     reloadTime: 1.5,
     magazineSize: 12,
     maxAmmo: 120,

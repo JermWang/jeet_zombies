@@ -202,17 +202,11 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               >
                 <TwitterIcon className="w-6 h-6" />
               </a>
-              <a 
-                href="https://t.me/JeetZombies" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-blue-400 hover:text-blue-300"
-                aria-label="Telegram"
-              >
-                <TelegramIcon className="w-6 h-6" />
-              </a>
             </div>
-            <p className="text-white font-pixel-alt text-base">Exclusively on GFM</p> 
+            <div className="flex items-center justify-center mt-2"> 
+              <img src="/BonkLogo.webp" alt="Bonk Logo" className="w-6 h-6 mr-2" /> 
+              <p className="text-white font-pixel-alt text-base">Exclusively on Bonk.Fun</p> 
+            </div>
             <div className="flex items-center space-x-2 mt-1"> 
               <span className="text-gray-400 font-mono text-xs break-all">
                 rKzH4ZqgqLSRygvFdrcTNg2cEVSCWSkmDcYJpAvGGFM

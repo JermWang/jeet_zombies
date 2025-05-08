@@ -7,8 +7,8 @@ import * as THREE from 'three'; // Use * as THREE for THREE.Vector3
 import { GROUP_ENVIRONMENT } from '@/lib/physicsConstants';
 
 // Constants (can be moved to a shared constants file if used elsewhere)
-const SPAWN_RADIUS_MIN = 45;
-const SPAWN_RADIUS_MAX = 55;
+const SPAWN_RADIUS_MIN = 55;
+const SPAWN_RADIUS_MAX = 140;
 const SPAWN_CHECK_HEIGHT = 10;
 const SAFE_SPAWN_Y_OFFSET = 0.1;
 const MAX_SPAWN_ATTEMPTS = 10;
