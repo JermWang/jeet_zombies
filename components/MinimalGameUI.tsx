@@ -67,7 +67,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   }, [waveStatus, currentWave, gameStarted]);
 
   const handleCopy = () => {
-    const contractAddress = "rKzH4ZqgqLSRygvFdrcTNg2cEVSCWSkmDcYJpAvGGFM";
+    const contractAddress = "GUGmP1mbeNqYW5hU2XNjTj1xqMxPddxscnNeXB7Zbonk";
     navigator.clipboard.writeText(contractAddress).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

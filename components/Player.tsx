@@ -443,7 +443,7 @@ export default function Player() {
       if (e.button === 0) {
         isFiringRef.current = false;
         // NOTE: May need to add logic here to STOP looping sounds for SMG/Rifle if they are implemented that way
-      }
+        }
     };
 
     document.addEventListener("mousedown", handleDocumentMouseDown); // For pointer lock
