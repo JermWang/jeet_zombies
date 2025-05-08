@@ -159,46 +159,55 @@ const WaveManager = () => {
                 return;
             }
             const config = WAVES[waveIndex];
-            let spawnedCount = zombiesSpawnedThisWave.current;
 
-            console.log(`%c[WaveManager Spawning] State active for Wave ${currentWave}. Need ${config.zombieCount}, spawned ${spawnedCount}. Starting interval.`, "color: blue");
+            console.log(`%c[WaveManager Spawning] State active for Wave ${currentWave}. Need ${config.zombieCount}, spawned ${zombiesSpawnedThisWave.current}. Starting interval.`, "color: blue");
 
             if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
 
-            spawnIntervalRef.current = setInterval(() => {
-                console.log(`[WaveManager Spawning Interval Tick] Wave: ${currentWave}, Spawned: ${spawnedCount}, Needed: ${config.zombieCount}`);
-                if (spawnedCount < config.zombieCount) {
-                    if (!findSafeSpawnPoint) {
+            const intervalId = setInterval(() => {
+                const currentSpawnedCount = zombiesSpawnedThisWave.current;
+                console.log(`%c[WaveManager Interval START] Tick for Wave: ${currentWave}. Current spawned count for this wave: ${currentSpawnedCount}. Target: ${config.zombieCount}`, "color: magenta");
+
+                console.log(`[WaveManager Spawning Interval Tick] Wave: ${currentWave}, Spawned: ${currentSpawnedCount}, Needed: ${config.zombieCount}`);
+                
+                if (currentSpawnedCount < config.zombieCount) {
+                    const findSafeSpawnPointFn = findSafeSpawnPointRef.current;
+                    if (!findSafeSpawnPointFn) {
                          console.error("[WaveManager Spawning] findSafeSpawnPoint function (ref) not available in store AT TICK TIME!");
-                         if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
+                         clearInterval(intervalId);
                          spawnIntervalRef.current = null;
                          return;
                     }
-                    const spawnPos = findSafeSpawnPoint();
+                    const spawnPos = findSafeSpawnPointFn();
+                    console.log(`%c[WaveManager Spawning] Attempting to find spawnPos for zombie #${currentSpawnedCount + 1}. Result: ${spawnPos ? JSON.stringify(spawnPos) : 'NULL'}`, "color: orange");
+
                     if (spawnPos) {
+                        const spawnEnemyFn = spawnEnemyRef.current;
                         const enemyType = selectZombieType(config.types);
-                        const spawnedId = spawnEnemy(enemyType, spawnPos);
-                        console.log(`%c[WaveManager Spawning Attempt] Wave: ${currentWave}, Spawn #: ${spawnedCount + 1}/${config.zombieCount}, Type: ${enemyType}, Pos: ${JSON.stringify(spawnPos)}, Spawned ID: ${spawnedId}`, "color: #FFD700"); // Gold color for visibility
+                        const spawnedId = spawnEnemyFn(enemyType, spawnPos);
+                        console.log(`%c[WaveManager Spawning Attempt] Wave: ${currentWave}, Spawn #: ${currentSpawnedCount + 1}/${config.zombieCount}, Type: ${enemyType}, Pos: ${JSON.stringify(spawnPos)}, Spawned ID: ${spawnedId}`, "color: #FFD700");
                         if (spawnedId !== null) {
-                            spawnedCount++;
-                            zombiesSpawnedThisWave.current = spawnedCount;
+                            zombiesSpawnedThisWave.current += 1;
                         } else {
                             console.warn("[WaveManager Spawning] spawnEnemy returned null (pool full or other issue?). Pausing spawn interval for this wave.");
-                            if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
-                            // Do not set to null, might want to allow a resume or other handling for this wave
+                            clearInterval(intervalId);
+                            spawnIntervalRef.current = null;
                         }
                     } else {
                         console.error("[WaveManager Spawning] Could not find safe spawn position. Stopping wave spawn.");
-                        if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
+                        clearInterval(intervalId);
                         spawnIntervalRef.current = null;
                     }
                 } else {
-                    if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
+                    clearInterval(intervalId);
                     spawnIntervalRef.current = null;
                     console.log(`%c[WaveManager Spawning] Finished spawning Wave ${currentWave}. Transitioning to Active.`, "color: blue; font-weight: bold");
-                    setWaveActive();
+                    setWaveActiveRef.current();
                 }
             }, config.spawnDelay);
+
+            spawnIntervalRef.current = intervalId;
+
         } else {
              if (spawnIntervalRef.current) {
                 console.log("%c[WaveManager Spawning] Clearing spawn interval as status is not Spawning.", "color: orange");
@@ -207,13 +216,14 @@ const WaveManager = () => {
              }
         }
         return () => {
-             if (spawnIntervalRef.current) {
+             const intervalToClear = spawnIntervalRef.current;
+             if (intervalToClear) {
                 console.log("%c[WaveManager Spawning] Cleaning up spawn interval effect cleanup.", "color: orange");
-                clearInterval(spawnIntervalRef.current);
-                // spawnIntervalRef.current = null; // Avoid race condition if effect re-runs quickly
+                clearInterval(intervalToClear);
+                spawnIntervalRef.current = null;
              }
         };
-    }, [waveStatus, currentWave, gameStarted]); 
+    }, [waveStatus, currentWave, gameStarted]);
 
     useEffect(() => {
         const setWaveBetween = setWaveBetweenRef.current;

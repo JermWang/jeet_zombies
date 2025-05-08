@@ -112,6 +112,46 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
         </div>
       )}
 
+      {/* In-game Controls Button */}
+      {gameStarted && !isGameOver && (
+        <div className="absolute bottom-4 left-4 pointer-events-auto z-30">
+          <Button
+            onClick={() => setShowControls(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-pixel text-xs px-3 py-1 rounded"
+          >
+            Controls
+          </Button>
+        </div>
+      )}
+
+      {/* In-game Controls Panel Modal */}
+      {gameStarted && !isGameOver && showControls && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center pointer-events-auto z-50 backdrop-blur-sm">
+          <div className="bg-neutral-800 p-6 rounded-lg shadow-xl text-left max-w-md w-full border border-neutral-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-red-500 font-pixel text-2xl">CONTROLS:</h2>
+              <Button
+                onClick={() => setShowControls(false)}
+                className="text-gray-400 hover:text-white font-pixel text-3xl leading-none p-1"
+                variant="ghost" 
+              >
+                &times;
+              </Button>
+            </div>
+            <ul className="text-red-300 font-pixel-alt space-y-1 text-lg">
+              <li>WASD - Move</li>
+              <li>MOUSE - Look around</li>
+              <li>LEFT CLICK - Shoot</li>
+              <li>R - Reload</li>
+              <li>1-3 - Switch weapons</li>
+              <li>SPACE - Jump</li>
+              <li>SHIFT - Sprint</li>
+              <li>PRESS E TO INTERACT</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
       {gameStarted && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-center">
               {waveMessage && (
@@ -175,21 +215,6 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               {showControls ? "Hide Controls" : "Show Controls"}
             </button>
           </div>
-
-          {showControls && (
-            <div className="mt-4 bg-black/80 p-4 rounded text-left">
-              <h2 className="text-red-500 font-pixel mb-2">CONTROLS:</h2>
-              <ul className="text-red-300 font-pixel-alt space-y-1">
-                <li>WASD - Move</li>
-                <li>MOUSE - Look around</li>
-                <li>LEFT CLICK - Shoot</li>
-                <li>R - Reload</li>
-                <li>1-3 - Switch weapons</li>
-                <li>SPACE - Jump</li>
-                <li>SHIFT - Sprint</li>
-              </ul>
-            </div>
-          )}
 
           <div className="flex flex-col items-center space-y-2 mt-6 pointer-events-auto px-4 w-full">
             <div className="flex space-x-4">

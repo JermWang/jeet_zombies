@@ -30,7 +30,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     hitboxArgs: [0.4, 1.2],             
     hitboxOffsetY: 0.6,                  // Collider center (height / 2)
     visualYOffset: 0.6,                  // Match hitboxOffsetY for testing
-    speed: 2.0, 
+    speed: 3.0,
     attackRange: 1.5,
     minDamage: 10, // UPDATED
     maxDamage: 10, // NEW
@@ -48,7 +48,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     hitboxArgs: [0.6, 2.6],             
     hitboxOffsetY: 1.3,                  // Collider center (height / 2)
     visualYOffset: 1.8,                  // Reverted: Original visual offset
-    speed: 1.8, 
+    speed: 2.7,
     attackRange: 2.0,
     minDamage: 30, // UPDATED
     maxDamage: 50, // NEW
@@ -60,7 +60,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     hitboxArgs: [0.7, 0.8, 0.7], 
     hitboxOffsetY: 0.8, 
     visualYOffset: 1.0, // Reverted: Original visual offset (Adjust if needed)
-    speed: 2.0,
+    speed: 3.0,
     attackRange: 2.5,
     minDamage: 50,  // Placeholder UPDATED
     maxDamage: 75, // Placeholder NEW
@@ -73,7 +73,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     hitboxArgs: [0.4, 1.2],  
     hitboxOffsetY: 0.6,      
     visualYOffset: 1.0,      // Reverted: Original visual offset
-    speed: 2.0,
+    speed: 3.0,
     attackRange: 1.5,
     minDamage: 10, // UPDATED
     maxDamage: 10, // NEW

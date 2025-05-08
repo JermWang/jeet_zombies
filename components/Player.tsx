@@ -150,15 +150,16 @@ export default function Player() {
   const [weaponSwitchAnimation, setWeaponSwitchAnimation] = useState(0)
   const [breathingAnim, setBreathingAnim] = useState(0)
   const [lastShootTime, setLastShootTime] = useState(0)
-  const lastInteractTime = useRef(0); // CORRECTED: Use ref for cooldown timer
+  const lastInteractTime = useRef(0);
   const INTERACT_COOLDOWN = 300
-  const PICKUP_RADIUS = 2.5; // NEW: Radius for proximity pickup
-  const [muzzleFlash, setMuzzleFlash] = useState<MuzzleFlashState>({ // Muzzle Flash state
+  const PICKUP_RADIUS = 2.5;
+  const [muzzleFlash, setMuzzleFlash] = useState<MuzzleFlashState>({
     visible: false,
     intensity: 0,
     color: "#ffffff",
     timeoutId: null,
   });
+  const isFiringRef = useRef(false);
 
   // Camera control
   const [mouseLookEnabled, setMouseLookEnabled] = useState(false)
@@ -276,54 +277,191 @@ export default function Player() {
       (1 << GROUP_ENVIRONMENT) | (1 << GROUP_ENEMY_HITBOX) // Interacts with Environment AND Enemy Hitbox groups
   );
 
-  // Handle mouse controls
+  // --- Moved Firing Logic Upwards to resolve linter errors ---
+  const triggerRecoil = () => {
+    setRecoilAnimation(1)
+  }
+
+  const triggerMuzzleFlash = useCallback(() => {
+    if (!currentWeapon) return;
+    const weaponData = weapons[currentWeapon];
+    if (!weaponData?.muzzleFlash) return;
+    if (muzzleFlash.timeoutId) {
+      clearTimeout(muzzleFlash.timeoutId);
+    }
+    setMuzzleFlash((prev) => ({
+      ...prev,
+      visible: true,
+      intensity: weaponData.muzzleFlash.intensity,
+      color: weaponData.muzzleFlash.color,
+      timeoutId: null 
+    }));
+    const timeoutId = setTimeout(() => {
+      setMuzzleFlash((prev) => ({ ...prev, visible: false, timeoutId: null }));
+    }, weaponData.muzzleFlash.duration);
+    setMuzzleFlash((prev) => ({ ...prev, timeoutId }));
+  }, [currentWeapon, muzzleFlash.timeoutId]);
+
+  const handleShoot = useCallback(() => { 
+    const world = rapier.world; 
+    const rapierInstance = rapier.rapier;
+    if (!world || !rapierInstance || !playerRef.current) return false;
+    if (isGameOver || !currentWeapon || isReloading) return false;
+    const weaponData = weapons[currentWeapon];
+    if (!weaponData) return false;
+    const dynamicShootCooldown = 1000 / weaponData.fireRate;
+    const now = performance.now();
+    if (now - lastShootTime < dynamicShootCooldown) {
+      return false;
+    }
+    const shotSuccessful = shoot(); // From useWeaponStore
+    if (!shotSuccessful) {
+      return false;
+    }
+    setLastShootTime(now);
+    try {
+      // Sounds for SINGLE SHOT weapons triggered PER SHOT
+      switch (currentWeapon) {
+        case "pistol": playPistolSound(); break;
+        case "shotgun": playShotgunSound(); break;
+        // case "smg": playSmgSound(); break; // MOVED TO MOUSEDOWN
+        // case "rifle": playRifleSound(); break; // MOVED TO MOUSEDOWN
+        default: break; // Removed warning for potentially handled auto weapons
+      }
+    } catch (error) {
+      console.warn("Failed to play single-shot shooting sound:", error);
+    }
+    triggerRecoil();
+    triggerMuzzleFlash();
+    const gunPosition = new THREE.Vector3();
+    if (gunRef.current) {
+      gunRef.current.getWorldPosition(gunPosition);
+    } else if (playerRef.current) {
+      const playerPos = playerRef.current.translation();
+      gunPosition.set(playerPos.x, playerPos.y + 1.5, playerPos.z);
+    }
+    const rayOrigin = camera.position.clone();
+    const rayDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+    const ray = new rapierInstance.Ray(rayOrigin, rayDirection);
+    const maxDistance = 200;
+    const groups = bulletRayCollisions;
+    const hitData = world.castRayAndGetNormal(ray, maxDistance, true, groups);
+    let targetPoint: THREE.Vector3;
+    let hitEnemyId: number | null = null;
+    if (hitData) {
+      const rapierHitPoint = ray.pointAt(hitData.timeOfImpact);
+      targetPoint = new THREE.Vector3(rapierHitPoint.x, rapierHitPoint.y, rapierHitPoint.z);
+      const hitCollider = hitData.collider;
+      const hitBody = hitCollider.parent();
+      const userData = hitBody?.userData;
+      if (userData && typeof userData === 'object' && userData !== null && 'type' in userData && userData.type === 'enemy' && 'id' in userData) {
+        hitEnemyId = userData.id as number;
+      }
+    } else {
+      targetPoint = rayOrigin.clone().add(rayDirection.multiplyScalar(maxDistance));
+    }
+    const cameraForwardDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+    const muzzleOffset = 0.5;
+    const muzzlePosition = gunPosition.clone().add(cameraForwardDirection.multiplyScalar(muzzleOffset));
+    const correctedBulletDirection = new THREE.Vector3().subVectors(targetPoint, muzzlePosition).normalize();
+    const shootEvent = new CustomEvent("playerShoot", {
+      detail: {
+            position: muzzlePosition,
+        direction: correctedBulletDirection,
+        weaponId: currentWeapon,
+            damage: weaponData.damage,
+            hitEnemyId: hitEnemyId
+        }
+    });
+    window.dispatchEvent(shootEvent);
+    return true;
+  }, [ 
+    rapier.world, rapier.rapier, isGameOver, currentWeapon, isReloading, lastShootTime, shoot, 
+    playPistolSound, playShotgunSound, triggerRecoil, triggerMuzzleFlash, 
+    camera.quaternion, camera.position, playerRef, gunRef, damageEnemy
+  ]);
+  // --- End of Moved Firing Logic ---
+
+  // Handle mouse controls (This useEffect now comes AFTER handleShoot is defined)
   useEffect(() => {
-    const handleMouseDown = (event: MouseEvent) => {
+    const handleDocumentMouseDown = (event: MouseEvent) => {
       if (event.button === 0 && !mouseLookEnabled) {
-        const target = event.target as HTMLElement
+        const target = event.target as HTMLElement;
         const isUIElement =
           target.closest("button") ||
           target.closest("input") ||
           target.closest('[role="button"]') ||
-          target.closest(".pointer-events-auto")
-
+          target.closest(".pointer-events-auto");
         if (!isUIElement) {
-          document.body.requestPointerLock()
+          document.body.requestPointerLock();
         }
       }
-    }
+    };
 
     const handlePointerLockChange = () => {
-      setMouseLookEnabled(document.pointerLockElement !== null)
-    }
+      setMouseLookEnabled(document.pointerLockElement !== null);
+    };
 
     const handleMouseMove = (event: MouseEvent) => {
-      if (!mouseLookEnabled || isGameOver) return
-
-      targetCameraRotation.current.y -= event.movementX * MOUSE_SENSITIVITY
-      targetCameraRotation.current.x += event.movementY * MOUSE_SENSITIVITY
-
-      targetCameraRotation.current.x = Math.max(MIN_PITCH, Math.min(MAX_PITCH, targetCameraRotation.current.x))
-
-      setCameraAngle(targetCameraRotation.current.y)
-    }
+      if (!mouseLookEnabled || isGameOver) return;
+      targetCameraRotation.current.y -= event.movementX * MOUSE_SENSITIVITY;
+      targetCameraRotation.current.x += event.movementY * MOUSE_SENSITIVITY;
+      targetCameraRotation.current.x = Math.max(MIN_PITCH, Math.min(MAX_PITCH, targetCameraRotation.current.x));
+      setCameraAngle(targetCameraRotation.current.y);
+    };
 
     const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault()
-    }
+      event.preventDefault();
+    };
 
-    document.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("contextmenu", handleContextMenu)
-    document.addEventListener("pointerlockchange", handlePointerLockChange)
+    const handleGameMouseDown = (e: MouseEvent) => {
+      if (e.button === 0 && mouseLookEnabled && !isGameOver) { 
+        const initialShotSuccess = handleShoot(); // Initial shot
+        
+        const weaponData = currentWeapon ? weapons[currentWeapon] : null;
+        if (weaponData?.automatic) {
+          isFiringRef.current = true;
+          // Play the AUTOMATIC weapon sound ONCE on mousedown if the initial shot was successful
+          if (initialShotSuccess) { 
+              try {
+                  switch (currentWeapon) {
+                      case "smg": playSmgSound(); break;
+                      case "rifle": playRifleSound(); break;
+                      default: break; // Should already be handled by single-shot in handleShoot
+                  }
+              } catch (error) {
+                  console.warn("Failed to play automatic shooting sound on mousedown:", error);
+              }
+          }
+        } else if (!weaponData?.automatic && initialShotSuccess) {
+            // Single-shot sounds are already handled within handleShoot itself
+        }
+      }
+    };
+
+    const handleGameMouseUp = (e: MouseEvent) => {
+      if (e.button === 0) {
+        isFiringRef.current = false;
+        // NOTE: May need to add logic here to STOP looping sounds for SMG/Rifle if they are implemented that way
+      }
+    };
+
+    document.addEventListener("mousedown", handleDocumentMouseDown); // For pointer lock
+    window.addEventListener("mousedown", handleGameMouseDown);     // For firing logic
+    window.addEventListener("mouseup", handleGameMouseUp);         // For firing logic
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
 
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("contextmenu", handleContextMenu)
-      document.removeEventListener("pointerlockchange", handlePointerLockChange)
-    }
-  }, [isGameOver, setCameraAngle, mouseLookEnabled])
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
+      window.removeEventListener("mousedown", handleGameMouseDown);
+      window.removeEventListener("mouseup", handleGameMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("pointerlockchange", handlePointerLockChange);
+    };
+  }, [isGameOver, setCameraAngle, mouseLookEnabled, handleShoot, currentWeapon, rapier, playSmgSound, playRifleSound]); // Added sound functions to deps
 
   useEffect(() => {
     if (isGameOver && document.pointerLockElement) {
@@ -335,208 +473,45 @@ export default function Player() {
   // Handle keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isGameOver) return
+      if (isGameOver) return;
 
-      if (e.key >= "1" && e.key <= "4") {
-        const weaponIndex = Number.parseInt(e.key) - 1
-        const weaponIds = ["pistol", "shotgun", "smg", "rifle"]
-        const targetWeapon = weaponIds[weaponIndex]
+      // Log the state of availableWeapons when a key is pressed
+      console.log('[handleKeyDown] Key pressed:', e.key, 'Current availableWeapons:', availableWeapons);
 
-        if (availableWeapons.includes(targetWeapon)) {
-          setCurrentWeapon(targetWeapon)
-          setWeaponSwitchAnimation(1)
-          playWeaponSwitchSound()
+      if (e.key >= "1" && e.key <= "9") { // Allow up to 9 weapon slots potentially
+        const weaponSlotIndex = Number.parseInt(e.key) - 1; // 0-indexed slot
+        
+        // Use the live availableWeapons array from the store
+        if (weaponSlotIndex >= 0 && weaponSlotIndex < availableWeapons.length) {
+          const targetWeapon = availableWeapons[weaponSlotIndex];
+          console.log(`[handleKeyDown] Slot ${e.key} corresponds to weapon: ${targetWeapon}`); // Log the target weapon
+          if (targetWeapon && targetWeapon !== currentWeapon) { // Check if different to avoid unnecessary sound/animation
+            console.log(`[handleKeyDown] Switching to weapon: ${targetWeapon}`); // Log the switch attempt
+            setCurrentWeapon(targetWeapon);
+            setWeaponSwitchAnimation(1);
+            playWeaponSwitchSound();
+          }
+        } else {
+          console.log(`No weapon in slot ${e.key}`);
         }
       }
 
       if (e.key === "r" || e.key === "R") {
         console.log("Reload key ('R') pressed");
-        reload()
+        reload();
       }
 
       if (e.code === "Space" && isGrounded.current && performance.now() - lastJumpTime.current > 300) {
-        verticalVelocityRef.current = JUMP_FORCE
-        isGrounded.current = false
-        playJumpSound()
-        lastJumpTime.current = performance.now()
+        verticalVelocityRef.current = JUMP_FORCE;
+        isGrounded.current = false;
+        playJumpSound();
+        lastJumpTime.current = performance.now();
       }
-    }
+    };
 
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isGameOver, availableWeapons, setCurrentWeapon, reload, playWeaponSwitchSound, playJumpSound])
-
-  // Define triggerRecoil simply
-  const triggerRecoil = () => {
-    setRecoilAnimation(1)
-  }
-
-  // --- Trigger Muzzle Flash --- 
-  const triggerMuzzleFlash = useCallback(() => {
-    if (!currentWeapon) return;
-    const weaponData = weapons[currentWeapon];
-    if (!weaponData?.muzzleFlash) return; // Check if muzzleFlash data exists
-
-    // Clear previous timeout if any
-    if (muzzleFlash.timeoutId) {
-      clearTimeout(muzzleFlash.timeoutId);
-    }
-
-    setMuzzleFlash((prev) => ({
-      ...prev,
-      visible: true,
-      intensity: weaponData.muzzleFlash.intensity, // Use original access
-      color: weaponData.muzzleFlash.color,         // Use original access
-      timeoutId: null // Clear timeout ID before setting new one
-    }));
-
-    // Set new timeout to hide the flash
-    const timeoutId = setTimeout(() => {
-      setMuzzleFlash((prev) => ({ ...prev, visible: false, timeoutId: null }));
-    }, weaponData.muzzleFlash.duration); // Use duration from weapon data
-
-    // Store the new timeout ID
-    setMuzzleFlash((prev) => ({ ...prev, timeoutId }));
-
-  }, [currentWeapon, muzzleFlash.timeoutId]); // Revert dependencies
-
-  // Define handleShoot simply (no useCallback)
-  const handleShoot = useCallback(() => { 
-    const world = rapier.world; 
-    const rapierInstance = rapier.rapier;
-    if (!world || !rapierInstance || !playerRef.current) return false;
-
-    if (isGameOver || !currentWeapon || isReloading) return false
-
-    const weaponData = weapons[currentWeapon]
-    if (!weaponData) return false
-
-    const dynamicShootCooldown = 1000 / weaponData.fireRate; // Calculate cooldown from fireRate
-    const now = performance.now()
-    if (now - lastShootTime < dynamicShootCooldown) { // Use dynamic cooldown
-      // console.log("Shoot cooldown active"); // Can be too noisy for auto weapons
-      return false
-    }
-
-    const shotSuccessful = shoot();
-    if (!shotSuccessful) {
-      console.log("Shoot failed (no ammo, reloading, or other issue)");
-      return false
-    }
-
-    console.log("Processing successful shot");
-    setLastShootTime(now) // Revert time setting
-
-    try {
-      switch (currentWeapon) {
-        case "pistol": playPistolSound(); break;
-        case "shotgun": playShotgunSound(); break;
-        case "smg": playSmgSound(); break;
-        case "rifle": playRifleSound(); break;
-        default: console.warn(`No shoot sound for weapon: ${currentWeapon}`);
-      }
-    } catch (error) {
-      console.warn("Failed to play shooting sound:", error)
-    }
-
-    triggerRecoil()
-    triggerMuzzleFlash() // Revert call
-
-    // --- Raycasting --- 
-    const gunPosition = new THREE.Vector3()
-    if (gunRef.current) {
-      gunRef.current.getWorldPosition(gunPosition)
-    } else if (playerRef.current) {
-        const playerPos = playerRef.current.translation()
-      gunPosition.set(playerPos.x, playerPos.y + 1.5, playerPos.z) // Fallback position
-    }
-
-    const rayOrigin = camera.position.clone();
-    const rayDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-    const ray = new rapierInstance.Ray(rayOrigin, rayDirection); // Use rapierInstance
-    const maxDistance = 200; // Revert max distance
-    
-    // Use the specific collision groups for the bullet ray
-    const groups = bulletRayCollisions; // Apply correct group
-    const hitData = world.castRayAndGetNormal(ray, maxDistance, true, groups);
-
-    let targetPoint: THREE.Vector3;
-    let hitEnemyId: number | null = null; // Variable to store hit enemy ID
-
-    if (hitData) {
-      const rapierHitPoint = ray.pointAt(hitData.timeOfImpact);
-      targetPoint = new THREE.Vector3(rapierHitPoint.x, rapierHitPoint.y, rapierHitPoint.z);
-
-      // Check if the hit collider belongs to an enemy
-      const hitCollider = hitData.collider;
-      const hitBody = hitCollider.parent();
-      const userData = hitBody?.userData;
-      console.log("[Player Shoot Raycast] Hit Body UserData:", userData); // More appropriate log for shooting
-      
-      if (userData && typeof userData === 'object' && userData !== null && 'type' in userData && userData.type === 'enemy' && 'id' in userData) {
-        hitEnemyId = userData.id as number; // Get the enemy ID
-        console.log(`Bullet hit enemy ID: ${hitEnemyId}`);
-        // Call game store function to damage enemy
-        // *** REMOVE THE DAMAGE CALL FROM HERE ***
-        // damageEnemy(hitEnemyId, weaponData.damage); 
-      } else {
-        console.log("Bullet hit non-enemy object or environment.");
-        // Optionally: Play bullet impact sound/effect for environment hits
-        // playBulletImpactSound({x: targetPoint.x, y: targetPoint.y, z: targetPoint.z});
-      }
-    } else {
-      targetPoint = rayOrigin.clone().add(rayDirection.multiplyScalar(maxDistance));
-      console.log("Bullet hit nothing.");
-    }
-
-    // --- Calculate Muzzle Position ---
-    const cameraForwardDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-    const muzzleOffset = 0.5; // Offset distance from gun center along forward direction
-    const muzzlePosition = gunPosition.clone().add(cameraForwardDirection.multiplyScalar(muzzleOffset));
-
-    // --- Calculate corrected direction for the bullet visual ---
-    const correctedBulletDirection = new THREE.Vector3().subVectors(targetPoint, muzzlePosition).normalize();
-
-    // Dispatch event (keep original)
-    console.log("Dispatching playerShoot event", { position: muzzlePosition.toArray(), direction: correctedBulletDirection.toArray(), weapon: currentWeapon, damage: weaponData.damage, hitEnemyId: hitEnemyId })
-    const shootEvent = new CustomEvent("playerShoot", {
-      detail: {
-            position: muzzlePosition,
-            direction: correctedBulletDirection, // USE CORRECTED DIRECTION
-        weaponId: currentWeapon,
-            damage: weaponData.damage,
-            hitEnemyId: hitEnemyId
-        }
-    })
-    window.dispatchEvent(shootEvent)
-
-    return true; // Revert return
-  }, [ 
-    rapier.world, rapier.rapier,
-    isGameOver, currentWeapon, isReloading, lastShootTime, shoot,
-    playPistolSound, playShotgunSound, playSmgSound, playRifleSound, 
-    triggerRecoil, triggerMuzzleFlash, camera.quaternion, camera.position,
-    playerRef, gunRef, damageEnemy // Add refs used for position fallback/calculation
-  ]);
-
-  // useEffect for mousedown listener (calls the regular handleShoot function)
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      // console.log("Mouse down event detected", { button: e.button, mouseLookEnabled, isGameOver });
-      if (e.button === 0 && mouseLookEnabled && !isGameOver) { 
-        // For non-automatic weapons, or the first shot of an automatic weapon
-        const weaponData = currentWeapon ? weapons[currentWeapon] : null;
-        if (!weaponData || !weaponData.automatic) {
-            // console.log("Calling handleShoot() for single fire or first auto shot...");
-            handleShoot(); 
-        }
-      }
-    }
-    window.addEventListener("mousedown", handleMouseDown)
-    return () => {
-      window.removeEventListener("mousedown", handleMouseDown)
-    }
-  }, [isGameOver, mouseLookEnabled, handleShoot, currentWeapon]); // NEW: Added currentWeapon
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isGameOver, availableWeapons, currentWeapon, setCurrentWeapon, reload, playWeaponSwitchSound, playJumpSound]); // Added currentWeapon back to deps as it's used in the comparison
 
   const handleCollision = (event: any) => {
     if (!isGameOver && health > 0) {
@@ -609,7 +584,6 @@ export default function Player() {
 
   // Use useFrame for game logic, physics, and camera updates
   useFrame((state, delta) => {
-    // If game is over, stop all player updates
     if (isGameOver) {
       if (playerRef.current) {
         playerRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true); // Stop movement
@@ -621,6 +595,15 @@ export default function Player() {
       }
       return; // Skip all other player logic
     }
+
+    // --- Automatic Firing in useFrame ---
+    if (isFiringRef.current && currentWeapon) {
+        const weaponData = weapons[currentWeapon];
+        if (weaponData?.automatic) {
+            handleShoot(); // Attempt to shoot, handleShoot itself respects fireRate
+        }
+    }
+    // --- End Automatic Firing ---
 
     const now = Date.now();
 

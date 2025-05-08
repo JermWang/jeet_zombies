@@ -80,9 +80,9 @@ export default function SimpleEnvironment() {
       
       {/* Lighting */}
       <Environment files="/hdri/NightEnvironmentHDRI008_1K-HDR.exr" background />
-      <ambientLight intensity={0.15} /> {/* Slightly reduced ambient */}
+      <ambientLight color="#401010" intensity={0.25} /> 
       <directionalLight
-        position={[10, 15, 10]} 
+        position={[-10, 15, -10]} 
         intensity={0.6} // Slightly reduced directional
         castShadow
         shadow-mapSize-width={1024}
