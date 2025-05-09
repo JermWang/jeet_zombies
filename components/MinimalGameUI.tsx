@@ -31,7 +31,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   const [copied, setCopied] = useState(false);
 
   // Define the contract address as a constant
-  const CONTRACT_ADDRESS = "GUGmP1mbeNqYW5hU2XNjTj1xqMxPddxscnNeXB7Zbonk";
+  const CONTRACT_ADDRESS = "COMING SOON";
 
   useEffect(() => {
     if (isPlayerHit) {
@@ -232,8 +232,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               </a>
             </div>
             <div className="flex items-center justify-center mt-2"> 
-              <img src="/BonkLogo.webp" alt="Bonk Logo" className="w-6 h-6 mr-2" /> 
-              <p className="text-white font-pixel-alt text-base">Exclusively on Bonk.Fun</p> 
+              <p className="text-white font-pixel-alt text-base">Exclusively on GoFundMeme</p> 
             </div>
             <div className="flex items-center space-x-2 mt-1"> 
               {/* Use the constant for display */}
