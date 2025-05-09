@@ -31,7 +31,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   const [copied, setCopied] = useState(false);
 
   // Define the contract address as a constant
-  const CONTRACT_ADDRESS = "COMING SOON";
+  const CONTRACT_ADDRESS = "bXzXzvk94KC6V6U8wgLQ2DfH3owQMXyqGPA3czfDGFM";
 
   useEffect(() => {
     if (isPlayerHit) {
