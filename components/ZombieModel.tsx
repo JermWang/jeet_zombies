@@ -1,4 +1,4 @@
-import React, { useMemo, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
 import * as THREE from 'three';
 
 // Define the props, including refs for animation targeting and type
@@ -13,35 +13,38 @@ interface ZombieModelProps {
   scale?: number;       // NEW: archetype visual scale
 }
 
-// Create materials (can be shared or made conditional if types differ drastically)
+// --- Module-level SHARED materials (one set per app, reused by every zombie) ---
+// Previously each zombie instance allocated ~6 materials (240+ for a full horde),
+// thrashing memory + GPU state. These are shared; tinted skin/shirt are cached
+// per tint so all zombies of the same archetype share two materials.
+const redEyeMaterial = new THREE.MeshStandardMaterial({ color: '#ff0000', emissive: '#ff0000', emissiveIntensity: 2 });
+const brownPantsMaterial = new THREE.MeshStandardMaterial({ color: '#6b4d3b', roughness: 0.7 });
+const mouthMaterial = new THREE.MeshStandardMaterial({ color: '#400000', roughness: 0.9 });
+const flashMaterial = new THREE.MeshStandardMaterial({ color: '#FF0000', emissive: '#FF0000', emissiveIntensity: 1, roughness: 1, metalness: 0 });
+
+const tintCache = new Map<string, { skin: THREE.MeshStandardMaterial; shirt: THREE.MeshStandardMaterial }>();
+function getTintMaterials(tint?: string) {
+  const key = tint || 'default';
+  let m = tintCache.get(key);
+  if (!m) {
+    const shirt = new THREE.Color(tint || '#a13a3a');
+    if (tint) shirt.multiplyScalar(0.7);
+    m = {
+      skin: new THREE.MeshStandardMaterial({ color: tint || '#5a8a58', roughness: 0.8 }),
+      shirt: new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.7 }),
+    };
+    tintCache.set(key, m);
+  }
+  return m;
+}
+
 const ZombieModel = forwardRef<THREE.Group, ZombieModelProps>(
   ({ type, leftArmRef, rightArmRef, leftLegRef, rightLegRef, isFlashing, tint, scale }, ref) => {
-    // Shared materials — skin/shirt tint per archetype when `tint` is supplied.
-    const greenSkinMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: tint || '#5a8a58', roughness: 0.8 }), [tint]);
-    const redEyeMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ff0000', emissive: '#ff0000', emissiveIntensity: 2 }), []);
-    const brownPantsMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#6b4d3b', roughness: 0.7 }), []);
-    const mouthMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#400000', roughness: 0.9 }), []);
-    // Standard specific — shirt is a darker shade of the tint if provided.
-    const redShirtMaterial = useMemo(() => {
-      const c = new THREE.Color(tint || '#a13a3a');
-      if (tint) c.multiplyScalar(0.7);
-      return new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
-    }, [tint]);
+    const { skin: greenSkinMaterial, shirt: redShirtMaterial } = getTintMaterials(tint);
 
     // Any non-brute type uses the rigged humanoid body so archetypes inherit the
     // walk/arm animation. Brute keeps its bespoke bulkier build below.
     const isHumanoid = type !== 'zombie_brute';
-
-    // Note: Brute uses greenSkinMaterial for torso and brownPantsMaterial for shorts
-
-    // Simple red flash material
-    const flashMaterial = useMemo(() => new THREE.MeshStandardMaterial({ 
-        color: '#FF0000', 
-        emissive: '#FF0000', 
-        emissiveIntensity: 1, 
-        roughness: 1, 
-        metalness: 0
-    }), []);
 
     // Conditionally return JSX based on type
     return (

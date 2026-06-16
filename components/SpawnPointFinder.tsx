@@ -6,12 +6,13 @@ import useGameStore from '@/hooks/useGameStore';
 import * as THREE from 'three'; // Use * as THREE for THREE.Vector3
 import { GROUP_ENVIRONMENT } from '@/lib/physicsConstants';
 
-// Constants (can be moved to a shared constants file if used elsewhere)
-// The arena is bounded by walls at +/-50, so zombies MUST spawn inside that ring
-// or they're stuck outside and never reach the player. Spawn ~18-40 from center:
-// close enough to engage within a few seconds, far enough to not pop in your face.
-const SPAWN_RADIUS_MIN = 18;
-const SPAWN_RADIUS_MAX = 40;
+// Zombies spawn on a ring at the OUTSKIRTS of the playable arena (around world
+// center, NOT around the player) and then steer inward toward the player — so
+// the horde always converges from the map edges instead of popping in around you.
+// Kept just inside the +/-50 walls (with door gaps) so they can reach the player;
+// the obstacle check below rejects any point buried in a wall.
+const SPAWN_RADIUS_MIN = 40;
+const SPAWN_RADIUS_MAX = 48;
 const SPAWN_CHECK_HEIGHT = 10;
 const SAFE_SPAWN_Y_OFFSET = 0.1;
 const MAX_SPAWN_ATTEMPTS = 10;

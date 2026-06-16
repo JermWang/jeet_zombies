@@ -40,6 +40,7 @@ import PreviewZombies from './PreviewZombies'; // ADD THIS LINE
 import PickupManager from "./PickupManager"; // NEW: Import PickupManager
 import JuiceManager from "./JuiceManager"; // NEW: combat feedback overlay (hit markers, shake, kill feed)
 import LoadingOverlay from "./LoadingOverlay"; // NEW: real asset-loading progress bar
+import InteractPrompt from "./InteractPrompt"; // NEW: "[E] pick up" prompt near pickups
 
 // Phase 6: prefetch heavy GLB models so the first zombie/boss/prop spawn doesn't hitch.
 useGLTF.preload("/models/zombie_animated.glb");
@@ -214,6 +215,7 @@ export default function Game() {
 
       {gameStarted && <WaveUI />}
       {gameStarted && <JuiceManager />}
+      {gameStarted && <InteractPrompt />}
 
       <MinimalGameUI
         gameStarted={gameStarted} 

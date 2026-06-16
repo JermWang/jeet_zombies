@@ -154,6 +154,8 @@ export default function Player() {
   const lastInteractTime = useRef(0);
   const INTERACT_COOLDOWN = 300
   const PICKUP_RADIUS = 2.5;
+  const PROMPT_RADIUS = 3.6; // slightly larger than pickup radius so the "[E]" prompt shows first
+  const nearbyInteractRef = useRef<string | null>(null);
   const [muzzleFlash, setMuzzleFlash] = useState<MuzzleFlashState>({
     visible: false,
     intensity: 0,
@@ -190,17 +192,18 @@ export default function Player() {
   const lastDamageTime = useRef(0)
   const damageInterval = 1000
 
-  // Camera settings — over-the-shoulder third person.
-  const CAMERA_DISTANCE = 5.2
-  const CAMERA_HEIGHT = 2.7        // lower = less top-down, more behind-the-shoulder
-  const CAMERA_SHOULDER = 1.5      // lateral offset so the player sits off to the side
-  const CAMERA_SMOOTHING = 0.08
-  const ROTATION_SMOOTHING = 0.95
-  const MOUSE_SENSITIVITY = 0.002
+  // Camera settings — comfortable over-the-shoulder third person.
+  const CAMERA_DISTANCE = 4.6        // a bit closer to the player
+  const CAMERA_HEIGHT = 3.1          // lifted up a touch
+  const CAMERA_SHOULDER = 1.4        // lateral offset so the player sits off to the side
+  // Framerate-INDEPENDENT smoothing rates (used as 1 - exp(-rate*delta)). Higher
+  // = snappier. This kills the turning "shake" that came from per-frame lerps at
+  // variable FPS, while keeping 360° turning fluid and not too fast.
+  const CAMERA_TURN_RESPONSE = 15    // look/turn smoothing
+  const CAMERA_FOLLOW_RESPONSE = 11  // position follow smoothing
+  const MOUSE_SENSITIVITY = 0.0019
   const MAX_PITCH = Math.PI / 2.5 // ~72 degrees
   const MIN_PITCH = -Math.PI / 4 // Increased downward look to -45 degrees
-  // New constant for positional lerp
-  const CAMERA_POS_LERP_FACTOR = 0.1 // Adjust for desired positional smoothing (higher = faster)
 
   // Movement settings
   const MOVE_SPEED = 8
@@ -650,6 +653,30 @@ export default function Player() {
 
     const now = Date.now();
 
+    // --- Interaction prompt: detect the nearest pickup each frame and tell the
+    // HUD what to show (e.g. "[E] Pick up SHOTGUN"). Only emits on change. ---
+    if (playerRef.current) {
+      const pv = playerRef.current.translation();
+      let bestLabel: string | null = null;
+      let bestDist = PROMPT_RADIUS;
+      for (const wp of weaponPickups) {
+        if (wp.collected) continue;
+        const dx = wp.position[0] - pv.x, dz = wp.position[2] - pv.z;
+        const d = Math.hypot(dx, dz);
+        if (d < bestDist) { bestDist = d; bestLabel = `Pick up ${String(wp.weaponId).toUpperCase()}`; }
+      }
+      for (const ap of ammoPickups) {
+        if (ap.collected) continue;
+        const dx = ap.position[0] - pv.x, dz = ap.position[2] - pv.z;
+        const d = Math.hypot(dx, dz);
+        if (d < bestDist) { bestDist = d; bestLabel = "Pick up AMMO"; }
+      }
+      if (bestLabel !== nearbyInteractRef.current) {
+        nearbyInteractRef.current = bestLabel;
+        window.dispatchEvent(new CustomEvent("jz:nearInteract", { detail: { label: bestLabel } }));
+      }
+    }
+
     // Interaction (E key)
     if (keys.interact && playerRef.current) {
       // console.log("[Player Interact Attempt] E pressed, keys.interact:", keys.interact); // DEBUG
@@ -743,11 +770,12 @@ export default function Player() {
         playAmbientMapNoiseSound();
     }
 
-    // --- Interpolate Camera Rotation --- 
-    cameraRotation.current.x += (targetCameraRotation.current.x - cameraRotation.current.x) * ROTATION_SMOOTHING;
+    // --- Interpolate Camera Rotation (framerate-independent → no turn shake) ---
+    const rotT = 1 - Math.exp(-CAMERA_TURN_RESPONSE * Math.min(delta, 0.1));
+    cameraRotation.current.x += (targetCameraRotation.current.x - cameraRotation.current.x) * rotT;
     let deltaY = targetCameraRotation.current.y - cameraRotation.current.y;
     deltaY = (deltaY + Math.PI) % (2 * Math.PI) - Math.PI;
-    cameraRotation.current.y += deltaY * ROTATION_SMOOTHING;
+    cameraRotation.current.y += deltaY * rotT;
 
     // --- Update Player Position --- (Based on moveDirection which uses cameraRotation.current.y)
     const playerPos = new THREE.Vector3(currentPositionRapier.x, currentPositionRapier.y, currentPositionRapier.z);
@@ -847,7 +875,8 @@ export default function Player() {
       -Math.cos(cameraRotation.current.y) * CAMERA_DISTANCE * Math.cos(cameraRotation.current.x) + rightZ * CAMERA_SHOULDER,
     )
     targetCameraPosition.current = newPositionThree.clone().add(cameraOffset)
-    camera.position.lerp(targetCameraPosition.current, CAMERA_POS_LERP_FACTOR);
+    const posT = 1 - Math.exp(-CAMERA_FOLLOW_RESPONSE * Math.min(delta, 0.1));
+    camera.position.lerp(targetCameraPosition.current, posT);
     // Look target shares the same lateral offset so the crosshair (screen center)
     // points just past the player's shoulder, not through their body.
     const lookTarget = newPositionThree.clone().add(
