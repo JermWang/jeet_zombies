@@ -24,16 +24,22 @@ export const metadata = {
   title: "JEET SURVIVAL",
   description: "HOLY SHIT! thats alotta jeets!",
   metadataBase: new URL('https://jeetsurvival.fun'),
+  icons: {
+    icon: '/PFP.png',
+    shortcut: '/PFP.png',
+    apple: '/PFP.png',
+  },
   openGraph: {
     title: "JEET SURVIVAL",
     description: "HOLY SHIT! thats alotta jeets!",
     url: 'https://jeetsurvival.fun',
+    siteName: 'Jeet Survival',
     images: [
       {
-        url: '/jeetsurvival.jpg', // Relative to metadataBase
-        width: 1200, // Optional: Specify image width
-        height: 630, // Optional: Specify image height
-        alt: 'JEET SURVIVAL Social Share Image',
+        url: '/banner.png',
+        width: 1500,
+        height: 500,
+        alt: 'JEET SURVIVAL',
       },
     ],
     type: 'website',
@@ -42,7 +48,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: "JEET SURVIVAL",
     description: "HOLY SHIT! thats alotta jeets!",
-    images: ['/jeetsurvival.jpg'], // Relative to metadataBase, or absolute URL
+    images: ['/banner.png'],
   },
 }
 
