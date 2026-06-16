@@ -9,6 +9,15 @@ export default function GunUI() {
   const currentAmmo = ammo[currentWeapon]
   const weaponData = weapons[currentWeapon]
 
+  // Dynamic crosshair — expands briefly on each shot for tactile feedback.
+  const [firing, setFiring] = useState(false)
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>
+    const onShoot = () => { setFiring(true); clearTimeout(t); t = setTimeout(() => setFiring(false), 90) }
+    window.addEventListener("playerShoot", onShoot)
+    return () => { window.removeEventListener("playerShoot", onShoot); clearTimeout(t) }
+  }, [])
+
   if (!currentAmmo || !weaponData) {
     // Handle case where weapon data might not be loaded yet or is invalid
     return null; 
@@ -54,15 +63,18 @@ export default function GunUI() {
         </div>
       </div>
 
-      {/* Center: Crosshair - Thicker, solid red */}
+      {/* Center: Crosshair — expands on fire for tactile feedback */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-        <div className="w-6 h-6 flex items-center justify-center">
-          {/* Center dot - slightly larger - Remove shadow */}
-          <div className={`w-1.5 h-1.5 bg-red-500 rounded-full`}></div> 
-          {/* Horizontal line - Use h-1 for thicker line */}
-          <div className={`absolute w-5 h-1 bg-red-500`}></div> 
-          {/* Vertical line - Use w-1 for thicker line */}
-          <div className={`absolute w-1 h-5 bg-red-500`}></div> 
+        <div
+          className="w-6 h-6 flex items-center justify-center transition-transform duration-75 ease-out"
+          style={{ transform: firing ? "scale(1.6)" : "scale(1)" }}
+        >
+          {/* Center dot */}
+          <div className={`w-1.5 h-1.5 bg-red-500 rounded-full`}></div>
+          {/* Horizontal line */}
+          <div className={`absolute w-5 h-1 bg-red-500`}></div>
+          {/* Vertical line */}
+          <div className={`absolute w-1 h-5 bg-red-500`}></div>
         </div>
       </div>
 

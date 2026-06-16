@@ -1,6 +1,12 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import useGameStore from "@/hooks/useGameStore"
+
+// Per-weapon screen-punch on fire — makes shooting feel weighty even on a miss.
+const WEAPON_KICK: Record<string, number> = { pistol: 1.5, smg: 1.2, rifle: 2.2, shotgun: 4.5 }
+
+interface DamageNumber { id: number; amount: number; kill: boolean; dx: number; dy: number }
 
 /**
  * JuiceManager — a pure DOM overlay that turns combat events into "game feel".
@@ -49,6 +55,13 @@ export default function JuiceManager() {
   const [killFeed, setKillFeed] = useState<KillFeedItem[]>([])
   const [combo, setCombo] = useState(0)
   const [comboPulse, setComboPulse] = useState(0)
+  const [damageNumbers, setDamageNumbers] = useState<DamageNumber[]>([])
+
+  // Low-health state drives a pulsing red vignette (clear danger feedback).
+  const health = useGameStore((s) => s.health)
+  const gameStarted = useGameStore((s) => s.gameStarted)
+  const isGameOver = useGameStore((s) => s.isGameOver)
+  const lowHealth = gameStarted && !isGameOver && health > 0 && health <= 30
 
   // --- Screen shake state (imperative, runs on its own rAF) ---
   const shakeAmount = useRef(0)
@@ -105,6 +118,25 @@ export default function JuiceManager() {
       window.clearTimeout(hitTimer)
       hitTimer = window.setTimeout(() => setHitMarker(null), detail.killed ? 220 : 110)
       addShake(detail.killed ? 5 : 2)
+
+      // Floating damage number near the crosshair (scattered so they don't stack).
+      if (typeof detail.amount === "number") {
+        const dn: DamageNumber = {
+          id: kfCounter++,
+          amount: Math.round(detail.amount),
+          kill: !!detail.killed,
+          dx: (Math.random() * 2 - 1) * 46,
+          dy: (Math.random() * 2 - 1) * 24,
+        }
+        setDamageNumbers((prev) => [...prev.slice(-9), dn])
+        window.setTimeout(() => setDamageNumbers((prev) => prev.filter((d) => d.id !== dn.id)), 650)
+      }
+    }
+
+    // Every shot the player fires gives a weapon-weighted screen punch.
+    const onShoot = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {}
+      addShake(WEAPON_KICK[detail.weaponId as string] ?? 1.5)
     }
 
     const onKill = (e: Event) => {
@@ -139,12 +171,14 @@ export default function JuiceManager() {
     window.addEventListener("jz:enemyKilled", onKill)
     window.addEventListener("jz:playerDamaged", onPlayerDamaged)
     window.addEventListener("jz:explosion", onExplosion)
+    window.addEventListener("playerShoot", onShoot)
 
     return () => {
       window.removeEventListener("jz:enemyHit", onHit)
       window.removeEventListener("jz:enemyKilled", onKill)
       window.removeEventListener("jz:playerDamaged", onPlayerDamaged)
       window.removeEventListener("jz:explosion", onExplosion)
+      window.removeEventListener("playerShoot", onShoot)
       window.clearTimeout(hitTimer)
       window.clearTimeout(comboTimer)
       if (shakeRaf.current != null) cancelAnimationFrame(shakeRaf.current)
@@ -212,7 +246,38 @@ export default function JuiceManager() {
         ))}
       </div>
 
+      {/* Floating damage numbers near the crosshair */}
+      <div className="absolute left-1/2 top-1/2">
+        {damageNumbers.map((d) => (
+          <span
+            key={d.id}
+            className={`jz-dmg absolute font-pixel tabular-nums ${
+              d.kill ? "text-red-500 text-2xl" : "text-yellow-300 text-lg"
+            } drop-shadow-[0_2px_0_rgba(0,0,0,0.9)]`}
+            style={{ left: d.dx, top: d.dy }}
+          >
+            {d.amount}
+          </span>
+        ))}
+      </div>
+
+      {/* Low-health vignette — pulses red when you're nearly dead */}
+      {lowHealth && (
+        <div
+          className="jz-lowhp absolute inset-0"
+          style={{ boxShadow: "inset 0 0 140px 40px rgba(220,0,0,0.55)" }}
+        />
+      )}
+
       <style jsx global>{`
+        @keyframes jz-dmg {
+          0% { transform: translateY(0) scale(0.6); opacity: 0; }
+          25% { transform: translateY(-10px) scale(1.1); opacity: 1; }
+          100% { transform: translateY(-42px) scale(1); opacity: 0; }
+        }
+        .jz-dmg { animation: jz-dmg 0.65s ease-out forwards; }
+        @keyframes jz-lowhp { 0%,100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+        .jz-lowhp { animation: jz-lowhp 1.1s ease-in-out infinite; }
         @keyframes jz-hitmarker {
           0% { transform: scale(0.5); opacity: 0; }
           30% { transform: scale(1.15); opacity: 1; }

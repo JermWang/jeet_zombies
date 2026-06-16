@@ -371,18 +371,18 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
 
       {!gameStarted && !isGameOver && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-auto">
-          <div className="flex flex-col items-center mb-6">
+          <div className="flex flex-col items-center gap-7 mb-8">
             <div className="relative inline-block">
-              <h1 className="text-4xl font-pixel text-red-600 uppercase">JEET ZOMBIES</h1>
+              <h1 className="text-5xl font-pixel text-red-600 uppercase tracking-wide drop-shadow-[0_3px_0_rgba(0,0,0,0.85)]">JEET ZOMBIES</h1>
               <span
-                className="absolute -top-1 -right-8 text-xs font-pixel text-yellow-400 transform"
+                className="absolute -top-2 -right-9 text-xs font-pixel text-yellow-400 transform"
               >
                 BETA
               </span>
             </div>
 
             {/* Player identity + level */}
-            <div className="mt-3 flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-sm">
               <span className="text-red-700 font-pixel-alt">PLAYER:</span>
               {editingName ? (
                 <input
@@ -403,29 +403,32 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               )}
             </div>
 
-            <Button
-              onClick={onStart}
-              className="bg-red-600 hover:bg-red-700 text-white font-pixel px-8 py-4 text-xl mt-3"
-              disabled={!hasInteracted}
-            >
-              {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
-            </Button>
+            {/* Primary actions */}
+            <div className="flex flex-col items-center gap-3 w-full">
+              <Button
+                onClick={onStart}
+                className="bg-red-600 hover:bg-red-700 text-white font-pixel px-10 py-5 text-2xl shadow-lg shadow-red-900/40"
+                disabled={!hasInteracted}
+              >
+                {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
+              </Button>
 
-            {/* Multiplayer — gated BETA. Disabled chip until the realtime server is live. */}
-            <button
-              onClick={() => MP_ENABLED && onStart()}
-              disabled={!MP_ENABLED}
-              title={MP_ENABLED ? "Join a multiplayer match" : "Multiplayer is coming soon"}
-              className={`mt-2 px-6 py-2 font-pixel text-sm rounded border ${
-                MP_ENABLED
-                  ? "border-purple-500 text-purple-300 hover:bg-purple-900/40"
-                  : "border-neutral-700 text-neutral-500 cursor-not-allowed"
-              }`}
-            >
-              MULTIPLAYER {MP_ENABLED ? "(BETA)" : "— SOON™"}
-            </button>
+              {/* Multiplayer — gated BETA. Disabled chip until the realtime server is live. */}
+              <button
+                onClick={() => MP_ENABLED && onStart()}
+                disabled={!MP_ENABLED}
+                title={MP_ENABLED ? "Join a multiplayer match" : "Multiplayer is coming soon"}
+                className={`px-6 py-2 font-pixel text-sm rounded border ${
+                  MP_ENABLED
+                    ? "border-purple-500 text-purple-300 hover:bg-purple-900/40"
+                    : "border-neutral-700 text-neutral-500 cursor-not-allowed"
+                }`}
+              >
+                MULTIPLAYER {MP_ENABLED ? "(BETA)" : "— SOON™"}
+              </button>
+            </div>
 
-            <div className="mt-3 flex items-center gap-3 flex-wrap justify-center">
+            <div className="flex items-center gap-5 flex-wrap justify-center">
               <button onClick={() => setShowLeaderboard(true)}
                 className="text-yellow-500 hover:text-yellow-300 font-pixel text-sm underline">
                 🏆 LEADERBOARD
@@ -441,7 +444,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mb-8">
             <button
               onClick={() => setShowControls(!showControls)}
               className="text-red-400 hover:text-red-300 font-pixel underline"
@@ -450,7 +453,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
             </button>
           </div>
 
-          <div className="flex flex-col items-center space-y-2 mt-6 pointer-events-auto px-4 w-full">
+          <div className="flex flex-col items-center space-y-3 pt-6 border-t border-neutral-800/70 pointer-events-auto px-4 w-full max-w-sm mx-auto">
             <div className="flex items-center space-x-4">
               <a
                 href="https://x.com/JeetZombies"

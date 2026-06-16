@@ -4,6 +4,9 @@ import { create } from "zustand"
 import { Howl } from "howler"
 import { useEffect, useRef, useState, useCallback } from "react"
 
+// Dev-only logger — these fire on every shot/sound, so keep them out of prod.
+const log = process.env.NODE_ENV === "development" ? console.log.bind(console) : () => {}
+
 // Define the structure for our sound effects state
 interface SoundEffectsState {
   audioContextStarted: boolean
@@ -137,7 +140,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
     ) => {
       // Prevent reloading if buffer already exists
       if (get()[key as keyof SoundEffectsState] instanceof Howl) {
-        console.log(`${String(key)} already loaded.`);
+        log(`${String(key)} already loaded.`);
         return;
       }
       const sound = new Howl({
@@ -147,7 +150,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
         volume: volume,
         // html5: true, // Removed for testing
         onload: () => {
-          console.log(`${String(key)} loaded successfully from ${path}`)
+          log(`${String(key)} loaded successfully from ${path}`)
           // Use functional update form of set for safety
           set((state) => ({ ...state, [key]: sound }))
         },
@@ -216,7 +219,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   // --- Playback Functions ---
   playPistolSound: () => {
     const buffer = get().pistolBuffer;
-    console.log("Attempting playPistolSound. Buffer exists:", !!buffer);
+    log("Attempting playPistolSound. Buffer exists:", !!buffer);
     buffer?.play();
   },
   playShotgunSound: () => get().shotgunBuffer?.play(),
@@ -226,12 +229,12 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   playWeaponSwitchSound: () => get().weaponSwitchBuffer?.play(),
   playJumpSound: () => {
     const buffer = get().jumpBuffer;
-    console.log("Attempting playJumpSound. Buffer exists:", !!buffer);
+    log("Attempting playJumpSound. Buffer exists:", !!buffer);
     buffer?.play();
   },
   playLandSound: () => {
     const buffer = get().landBuffer;
-    console.log("Attempting playLandSound. Buffer exists:", !!buffer);
+    log("Attempting playLandSound. Buffer exists:", !!buffer);
     buffer?.play();
   },
   playZombieBiteSound: () => get().zombieBiteBuffer?.play(),
@@ -242,7 +245,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
   playTransitionSound: () => get().transitionBuffer?.play(),
   playOuttaControlSound: () => {
     const buffer = get().outtaControlVOBuffer;
-    console.log("[SoundEffects] Attempting to play outtaControlVO. Buffer exists:", !!buffer);
+    log("[SoundEffects] Attempting to play outtaControlVO. Buffer exists:", !!buffer);
     buffer?.play();
   },
 
@@ -261,7 +264,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
       if (buffer && !buffer.playing()) {
         buffer.play();
         get().setLastMapNoisePlayTime(now);
-        console.log("Playing ambient map noise");
+        log("Playing ambient map noise");
       }
     }
   },
@@ -275,7 +278,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
       if (buffer && !buffer.playing()) {
         buffer.play();
         get().setLastZombieAmbientPlayTime(now);
-        console.log("Playing zombie ambient sound");
+        log("Playing zombie ambient sound");
       }
     }
   },
@@ -290,7 +293,7 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
     if (sound && !sound.playing()) {
       const soundId = sound.play()
        if (soundId) {
-          console.log("Playing ambient music.");
+          log("Playing ambient music.");
        } else {
            console.warn("Howler returned invalid soundId for ambient music.");
        }
@@ -304,13 +307,13 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
     const { batBuffer, lastBatSoundPlayTime, setLastBatSoundPlayTime } = get();
     const now = Date.now();
 
-    // console.log("Checking bat sound playback:", { now, lastBatSoundPlayTime, cooldown: BAT_SOUND_COOLDOWN }); // Keep for debugging if needed
+    // log("Checking bat sound playback:", { now, lastBatSoundPlayTime, cooldown: BAT_SOUND_COOLDOWN }); // Keep for debugging if needed
 
     if (batBuffer && now - lastBatSoundPlayTime > BAT_SOUND_COOLDOWN) {
-        console.log("Attempting to play bat sound...");
+        log("Attempting to play bat sound...");
         const soundId = batBuffer.play();
         if (soundId) {
-           console.log("Playing bat sound.");
+           log("Playing bat sound.");
            setLastBatSoundPlayTime(now); // Update timestamp after successful play attempt
         } else {
            console.warn("Howler returned invalid soundId for bat sound.");
@@ -318,23 +321,23 @@ export const useSoundEffects = create<SoundEffectsState>((set, get) => ({
     } else if (!batBuffer) {
       console.warn("Bat sound buffer not loaded yet.");
     } else {
-      // console.log("Bat sound cooldown active."); // Reduce noise
+      // log("Bat sound cooldown active."); // Reduce noise
     }
   },
 
   // --- Add Wave VO Playback Functions ---
   playWaveClearedVO: () => {
-    console.log(`%c[Sounds][Howler] playWaveClearedVO called. Buffer exists: ${!!get().waveClearedVOBuffer}`, "color: magenta");
+    log(`%c[Sounds][Howler] playWaveClearedVO called. Buffer exists: ${!!get().waveClearedVOBuffer}`, "color: magenta");
     get().waveClearedVOBuffer?.play();
   },
   playWaveIncomingVO: () => {
-    console.log(`%c[Sounds][Howler] playWaveIncomingVO called. Buffer exists: ${!!get().waveIncomingVOBuffer}`, "color: magenta");
+    log(`%c[Sounds][Howler] playWaveIncomingVO called. Buffer exists: ${!!get().waveIncomingVOBuffer}`, "color: magenta");
     get().waveIncomingVOBuffer?.play();
   },
   playCountdownVO: (count: number) => {
     // Log existence based on the switch logic below
     const bufferExists = (count === 3 && !!get().countdown3VOBuffer) || (count === 2 && !!get().countdown2VOBuffer) || (count === 1 && !!get().countdown1VOBuffer);
-    console.log(`%c[Sounds][Howler] playCountdownVO called with count: ${count}. Specific buffer exists: ${bufferExists}`, "color: magenta");
+    log(`%c[Sounds][Howler] playCountdownVO called with count: ${count}. Specific buffer exists: ${bufferExists}`, "color: magenta");
     let bufferToPlay: Howl | null = null;
     if (count === 3) bufferToPlay = get().countdown3VOBuffer;
     if (count === 2) bufferToPlay = get().countdown2VOBuffer;
@@ -358,7 +361,7 @@ export const useInitializeSounds = () => {
   useEffect(() => {
      // Make sure loading happens only once after context is started
     if (audioContextStarted && !soundPathsLoaded.current) {
-      console.log("[useInitializeSounds] Audio context started, loading sounds via Howler...");
+      log("[useInitializeSounds] Audio context started, loading sounds via Howler...");
       // Define the paths to your sound files
       // IMPORTANT: Add the new VO sound paths here!
       const soundPaths = {
@@ -397,14 +400,14 @@ export const useInitializeSounds = () => {
   // Function to resume audio context on user interaction
   const resumeAudioContext = useCallback(() => {
     if (!audioContextStarted) {
-      console.log("Attempting to resume audio context via user interaction...");
+      log("Attempting to resume audio context via user interaction...");
       // Set started immediately, let Howler handle unlock
       setAudioContextStarted(true);
       Howler.autoUnlock = true;
 
       // Still attempt the resume, but don't rely on its promise for state update
       Howler.ctx?.resume().then(() => {
-        console.log("Howler.ctx.resume() promise resolved successfully.");
+        log("Howler.ctx.resume() promise resolved successfully.");
       }).catch((e) => {
         console.error("Howler.ctx.resume() promise rejected:", e);
         // No need to set state here again
@@ -419,12 +422,12 @@ export const useInitializeSounds = () => {
     // but this is a fallback attempt if state is interrupted.
     // Also, set context started if it's already running (e.g., auto-resumed by browser)
     if (!audioContextStarted && Howler.ctx?.state === "running") {
-       console.log("Audio Context already running, setting state.");
+       log("Audio Context already running, setting state.");
        setAudioContextStarted(true);
        Howler.autoUnlock = true;
     } else if (!audioContextStarted && (Howler.ctx?.state as string) === "interrupted") {
        // Check state as string to handle non-standard "interrupted" state
-       console.log("Audio Context state is interrupted, attempting auto-resume...");
+       log("Audio Context state is interrupted, attempting auto-resume...");
        // Still set started immediately here too for consistency
        setAudioContextStarted(true);
        Howler.autoUnlock = true;
