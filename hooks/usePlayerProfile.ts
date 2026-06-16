@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useWallet } from "@solana/wallet-adapter-react"
+import { useWallet, useConnection } from "@solana/wallet-adapter-react"
+import { payEntryFee } from "@/lib/payEntryFee"
 
 // Identity model:
 //  - Anonymous: a stable player_id (uuid) generated client-side in localStorage.
@@ -60,7 +61,8 @@ export function usePlayerProfile() {
   const [profile, setProfile] = useState<ProfileSummary | null>(null)
   const [walletLinked, setWalletLinked] = useState(false)
 
-  const { publicKey, connected } = useWallet()
+  const { publicKey, connected, sendTransaction } = useWallet()
+  const { connection } = useConnection()
   const walletAddress = connected && publicKey ? publicKey.toBase58() : null
 
   useEffect(() => {
@@ -162,22 +164,43 @@ export function usePlayerProfile() {
     }
   }, [playerId, username, walletAddress, refresh])
 
-  // Pay the entry fee + record a tournament entry. (Fee tx is dry-run-accepted
-  // server-side until REWARDS_LIVE; a real SPL transfer is built here when live.)
-  const enterTournament = useCallback(async (feeTxSig?: string): Promise<{ ok: boolean; error?: string }> => {
+  // Pay the entry fee + record a tournament entry. When NEXT_PUBLIC_REWARDS_LIVE
+  // is "true" and the mint/treasury are configured, this builds a REAL SPL
+  // transfer the player signs in their wallet, then the server verifies it.
+  // Otherwise it uses the dry-run path (no funds move; server accepts the stub).
+  const enterTournament = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!playerId || !walletAddress) return { ok: false, error: "wallet_required" }
+
+    let feeTxSig = "dry-run"
+    const live = process.env.NEXT_PUBLIC_REWARDS_LIVE === "true"
+    const mint = process.env.NEXT_PUBLIC_SURVIVAL_TOKEN_MINT
+    const treasury = process.env.NEXT_PUBLIC_TREASURY_WALLET
+    const feeAmount = Number(process.env.NEXT_PUBLIC_ENTRY_FEE_AMOUNT || 0)
+
+    if (live && mint && treasury && feeAmount > 0) {
+      if (!publicKey || !sendTransaction) return { ok: false, error: "wallet_required" }
+      try {
+        feeTxSig = await payEntryFee({ connection, payer: publicKey, sendTransaction, mint, treasury, amount: feeAmount })
+      } catch (e: any) {
+        const msg = String(e?.message || "")
+        if (/insufficient|0x1\b/i.test(msg)) return { ok: false, error: "insufficient_$SURVIVAL" }
+        if (/User rejected|reject/i.test(msg)) return { ok: false, error: "payment_cancelled" }
+        return { ok: false, error: "payment_failed" }
+      }
+    }
+
     try {
       const res = await fetch("/api/tournament/enter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, walletAddress, feeTxSig: feeTxSig || "dry-run" }),
+        body: JSON.stringify({ playerId, walletAddress, feeTxSig }),
       })
       const data = await res.json()
       return { ok: !!data.ok, error: data.error }
     } catch {
       return { ok: false, error: "network" }
     }
-  }, [playerId, walletAddress])
+  }, [playerId, walletAddress, publicKey, sendTransaction, connection])
 
   return { playerId, username, setUsername, profile, refresh, submitMatch, enterTournament, walletLinked, walletAddress }
 }
