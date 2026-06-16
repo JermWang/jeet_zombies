@@ -11,6 +11,9 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 // const SPAWN_INTERVAL = 0.5; // Seconds between each zombie spawn within a wave - Original, replaced by waveConfig.spawnDelay
 // const MAP_RADIUS = 20; // Example radius to spawn zombies around - Not directly used, findSafeSpawnPoint handles logic
 
+// Dev-only logger — keeps the production console clean (wave logs fire per spawn).
+const log = process.env.NODE_ENV === "development" ? console.log.bind(console) : () => {};
+
 // Delays
 const INITIAL_DELAY = 3000;               // Delay before first wave starts (ms)
 // const WAVE_CLEARED_DISPLAY_TIME = 5000;   // How long "Wave Cleared" shows (ms) - Handled by WaveUI or BetweenWaves state duration
@@ -134,7 +137,7 @@ const WaveManager = () => {
 
     useEffect(() => {
         if (isGameOver || !gameStarted) {
-            console.log("%c[WaveManager Cleanup] Game over or not started. Clearing all timers and resetting internal state.", "color: red; font-weight: bold");
+            log("%c[WaveManager Cleanup] Game over or not started. Clearing all timers and resetting internal state.", "color: red; font-weight: bold");
             if (initialDelayTimerRef.current) clearTimeout(initialDelayTimerRef.current);
             if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
             if (nextWaveStartTimerRef.current) clearTimeout(nextWaveStartTimerRef.current);
@@ -151,20 +154,20 @@ const WaveManager = () => {
 
         if (waveStatus === 'Idle' && !initialStartAttempted.current) {
             initialStartAttempted.current = true;
-            console.log("%c[WaveManager Initial Start] Game started, setting timer for first wave spawning.", "color: green; font-weight: bold");
+            log("%c[WaveManager Initial Start] Game started, setting timer for first wave spawning.", "color: green; font-weight: bold");
             if (initialDelayTimerRef.current) clearTimeout(initialDelayTimerRef.current);
             initialDelayTimerRef.current = setTimeout(() => {
                 const waveIndex = 0;
                 if (waveIndex < WAVES.length) {
-                    console.log(`%c[WaveManager Initial Start] Timer finished. Triggering Spawning for Wave ${waveIndex + 1}.`, "color: green; font-weight: bold");
+                    log(`%c[WaveManager Initial Start] Timer finished. Triggering Spawning for Wave ${waveIndex + 1}.`, "color: green; font-weight: bold");
                     if (waveIndex + 1 === 10) {
-                        console.log("%c[WaveManager] Initial wave is Wave 10 (Boss Wave). Activating boss fight.", "color: magenta; font-weight: bold;");
+                        log("%c[WaveManager] Initial wave is Wave 10 (Boss Wave). Activating boss fight.", "color: magenta; font-weight: bold;");
                         setBossFightActiveRef.current(true);
                     }
                     startWaveSpawningRef.current(waveIndex + 1, WAVES[waveIndex].zombieCount);
                     zombiesSpawnedThisWave.current = 0;
                 } else {
-                    console.log("%c[WaveManager Initial Start] No waves defined!", "color: orange");
+                    log("%c[WaveManager Initial Start] No waves defined!", "color: orange");
                 }
             }, INITIAL_DELAY);
         }
@@ -190,15 +193,15 @@ const WaveManager = () => {
             }
             const config = getWaveConfig(currentWave);
 
-            console.log(`%c[WaveManager Spawning] State active for Wave ${currentWave}. Need ${config.zombieCount}, spawned ${zombiesSpawnedThisWave.current}. Starting interval.`, "color: blue");
+            log(`%c[WaveManager Spawning] State active for Wave ${currentWave}. Need ${config.zombieCount}, spawned ${zombiesSpawnedThisWave.current}. Starting interval.`, "color: blue");
 
             if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
 
             const intervalId = setInterval(() => {
                 const currentSpawnedCount = zombiesSpawnedThisWave.current;
-                console.log(`%c[WaveManager Interval START] Tick for Wave: ${currentWave}. Current spawned count for this wave: ${currentSpawnedCount}. Target: ${config.zombieCount}`, "color: magenta");
+                log(`%c[WaveManager Interval START] Tick for Wave: ${currentWave}. Current spawned count for this wave: ${currentSpawnedCount}. Target: ${config.zombieCount}`, "color: magenta");
 
-                console.log(`[WaveManager Spawning Interval Tick] Wave: ${currentWave}, Spawned: ${currentSpawnedCount}, Needed: ${config.zombieCount}`);
+                log(`[WaveManager Spawning Interval Tick] Wave: ${currentWave}, Spawned: ${currentSpawnedCount}, Needed: ${config.zombieCount}`);
                 
                 if (currentSpawnedCount < config.zombieCount) {
                     const findSafeSpawnPointFn = findSafeSpawnPointRef.current;
@@ -209,13 +212,13 @@ const WaveManager = () => {
                          return;
                     }
                     const spawnPos = findSafeSpawnPointFn();
-                    console.log(`%c[WaveManager Spawning] Attempting to find spawnPos for zombie #${currentSpawnedCount + 1}. Result: ${spawnPos ? JSON.stringify(spawnPos) : 'NULL'}`, "color: orange");
+                    log(`%c[WaveManager Spawning] Attempting to find spawnPos for zombie #${currentSpawnedCount + 1}. Result: ${spawnPos ? JSON.stringify(spawnPos) : 'NULL'}`, "color: orange");
 
                     if (spawnPos) {
                         const spawnEnemyFn = spawnEnemyRef.current;
                         const enemyType = selectZombieType(config.types);
                         const spawnedId = spawnEnemyFn(enemyType, spawnPos);
-                        console.log(`%c[WaveManager Spawning Attempt] Wave: ${currentWave}, Spawn #: ${currentSpawnedCount + 1}/${config.zombieCount}, Type: ${enemyType}, Pos: ${JSON.stringify(spawnPos)}, Spawned ID: ${spawnedId}`, "color: #FFD700");
+                        log(`%c[WaveManager Spawning Attempt] Wave: ${currentWave}, Spawn #: ${currentSpawnedCount + 1}/${config.zombieCount}, Type: ${enemyType}, Pos: ${JSON.stringify(spawnPos)}, Spawned ID: ${spawnedId}`, "color: #FFD700");
                         if (spawnedId !== null) {
                             zombiesSpawnedThisWave.current += 1;
                         } else {
@@ -231,7 +234,7 @@ const WaveManager = () => {
                 } else {
                     clearInterval(intervalId);
                     spawnIntervalRef.current = null;
-                    console.log(`%c[WaveManager Spawning] Finished spawning Wave ${currentWave}. Transitioning to Active.`, "color: blue; font-weight: bold");
+                    log(`%c[WaveManager Spawning] Finished spawning Wave ${currentWave}. Transitioning to Active.`, "color: blue; font-weight: bold");
                     setWaveActiveRef.current();
                 }
             }, config.spawnDelay);
@@ -240,7 +243,7 @@ const WaveManager = () => {
 
         } else {
              if (spawnIntervalRef.current) {
-                console.log("%c[WaveManager Spawning] Clearing spawn interval as status is not Spawning.", "color: orange");
+                log("%c[WaveManager Spawning] Clearing spawn interval as status is not Spawning.", "color: orange");
                 clearInterval(spawnIntervalRef.current);
                 spawnIntervalRef.current = null;
              }
@@ -248,7 +251,7 @@ const WaveManager = () => {
         return () => {
              const intervalToClear = spawnIntervalRef.current;
              if (intervalToClear) {
-                console.log("%c[WaveManager Spawning] Cleaning up spawn interval effect cleanup.", "color: orange");
+                log("%c[WaveManager Spawning] Cleaning up spawn interval effect cleanup.", "color: orange");
                 clearInterval(intervalToClear);
                 spawnIntervalRef.current = null;
              }
@@ -262,7 +265,7 @@ const WaveManager = () => {
 
         if (waveStatus === 'Active') {
             if (zombiesRemainingInWave <= 0) {
-                console.log(`%c[WaveManager Active] Wave ${currentWave} cleared! Transitioning to BetweenWaves.`, "color: purple; font-weight: bold");
+                log(`%c[WaveManager Active] Wave ${currentWave} cleared! Transitioning to BetweenWaves.`, "color: purple; font-weight: bold");
                 if (typeof playWaveClearedVORef.current === 'function') {
                     playWaveClearedVORef.current();
                 } else {
@@ -283,7 +286,7 @@ const WaveManager = () => {
             const nextWaveNumber = currentWave + 1;
             const nextWaveIndex = nextWaveNumber - 1;
             
-            console.log(`%c[WaveManager Between] State active. Setting timer for next wave (${nextWaveNumber}). Delay: ${TOTAL_BETWEEN_WAVE_DELAY}ms`, "color: purple");
+            log(`%c[WaveManager Between] State active. Setting timer for next wave (${nextWaveNumber}). Delay: ${TOTAL_BETWEEN_WAVE_DELAY}ms`, "color: purple");
 
             nextWaveStartTimerRef.current = setTimeout(() => {
                     if (nextWaveNumber === 10) {

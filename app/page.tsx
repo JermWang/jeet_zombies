@@ -16,30 +16,28 @@ export default function Home() {
   try {
     return (
       <main className="w-full h-screen relative">
-        {/* Debug UI */}
-        <div className="absolute top-0 right-0 z-50 p-4">
-          <button 
-            onClick={() => setShowDebug(!showDebug)} 
-            className="bg-red-600 text-white font-pixel-alt px-2 py-1 text-sm mb-2"
-          >
-            {showDebug ? "Hide Debug" : "Show Debug"}
-          </button>
-          
-          {showDebug && (
-            <div className="bg-black/80 p-4 text-white font-pixel-alt max-w-md">
-              <h3 className="text-red-500 mb-2">Project Info:</h3>
-              <ul className="text-xs space-y-1">
-                <li>Next.js: v14.0.0</li>
-                <li>React: v18.2.0</li>
-                <li>Three.js: v0.157.0</li>
-                <li>React Three Fiber: v8.14.5</li>
-                <li>React Three Drei: v9.88.0</li>
-                <li>React Three Rapier: v1.1.1</li>
-              </ul>
-            </div>
-          )}
-        </div>
-        
+        {/* Debug UI — development only, never shipped to production */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="absolute top-0 right-0 z-50 p-4">
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="bg-red-600 text-white font-pixel-alt px-2 py-1 text-sm mb-2"
+            >
+              {showDebug ? "Hide Debug" : "Show Debug"}
+            </button>
+
+            {showDebug && (
+              <div className="bg-black/80 p-4 text-white font-pixel-alt max-w-md">
+                <h3 className="text-red-500 mb-2">Project Info:</h3>
+                <ul className="text-xs space-y-1">
+                  <li>Next.js: v14</li>
+                  <li>React Three Fiber + Rapier</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Game component */}
         <Game />
       </main>

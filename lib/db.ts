@@ -12,12 +12,16 @@ function createPool() {
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set — cannot reach the JeetZombies database.")
   }
+  // On Vercel each serverless instance is isolated, so keep the per-instance pool
+  // tiny to avoid exhausting the Supabase pooler under concurrency. Locally we can
+  // afford a few more connections.
+  const isServerless = !!process.env.VERCEL
   return new Pool({
     connectionString,
     // Supabase pooler terminates SSL at the edge; relax cert verification.
     ssl: { rejectUnauthorized: false },
-    max: 5,
-    idleTimeoutMillis: 30_000,
+    max: isServerless ? 1 : 5,
+    idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
   })
 }

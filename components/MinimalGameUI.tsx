@@ -7,6 +7,7 @@ import TwitterIcon from "./ui/TwitterIcon"
 import TelegramIcon from "./ui/TelegramIcon"
 import { usePlayerProfile, type MatchSubmitResult } from "@/hooks/usePlayerProfile"
 import useCosmetics from "@/hooks/useCosmetics"
+import { MP_ENABLED } from "@/lib/featureFlags"
 import Leaderboard from "./Leaderboard"
 import Locker from "./Locker"
 import ChallengesPanel from "./ChallengesPanel"
@@ -407,6 +408,20 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
             >
               {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
             </Button>
+
+            {/* Multiplayer — gated BETA. Disabled chip until the realtime server is live. */}
+            <button
+              onClick={() => MP_ENABLED && onStart()}
+              disabled={!MP_ENABLED}
+              title={MP_ENABLED ? "Join a multiplayer match" : "Multiplayer is coming soon"}
+              className={`mt-2 px-6 py-2 font-pixel text-sm rounded border ${
+                MP_ENABLED
+                  ? "border-purple-500 text-purple-300 hover:bg-purple-900/40"
+                  : "border-neutral-700 text-neutral-500 cursor-not-allowed"
+              }`}
+            >
+              MULTIPLAYER {MP_ENABLED ? "(BETA)" : "— SOON™"}
+            </button>
 
             <div className="mt-3 flex items-center gap-3 flex-wrap justify-center">
               <button onClick={() => setShowLeaderboard(true)}
