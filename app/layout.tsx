@@ -24,11 +24,8 @@ export const metadata = {
   title: "JEET SURVIVAL",
   description: "HOLY SHIT! thats alotta jeets!",
   metadataBase: new URL('https://jeetsurvival.fun'),
-  icons: {
-    icon: '/PFP.png',
-    shortcut: '/PFP.png',
-    apple: '/PFP.png',
-  },
+  // Favicon + apple icon come from app/icon.png and app/apple-icon.png (Next.js
+  // file-based icons — auto-generated links, take precedence over /favicon.ico).
   openGraph: {
     title: "JEET SURVIVAL",
     description: "HOLY SHIT! thats alotta jeets!",
