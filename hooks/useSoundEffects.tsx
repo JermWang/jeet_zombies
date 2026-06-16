@@ -91,7 +91,7 @@ interface SoundEffectsState {
 // Configuration
 const MAP_NOISE_INTERVAL = 2 * 60 * 1000 // 2 minutes in milliseconds
 const ZOMBIE_AMBIENT_INTERVAL = 90 * 1000 // 1.5 minutes in milliseconds
-const BAT_SOUND_COOLDOWN = 7 * 60 * 1000 // 7 minutes in milliseconds (adjustable)
+const BAT_SOUND_COOLDOWN = 12 * 1000 // 12s — bats fly over often, so a 7-min cooldown meant you never heard them
 
 // Create the Zustand store
 export const useSoundEffects = create<SoundEffectsState>((set, get) => ({

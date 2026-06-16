@@ -44,7 +44,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   const [nowTick, setNowTick] = useState(0);
 
   // --- Account / progression ---
-  const { playerId, username, setUsername, profile, submitMatch } = usePlayerProfile();
+  const { playerId, username, setUsername, profile, submitMatch, walletLinked, walletAddress } = usePlayerProfile();
   const loadCosmetics = useCosmetics((s) => s.load);
   const [matchResult, setMatchResult] = useState<MatchSubmitResult | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -410,6 +410,14 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               )}
               {profile && (
                 <span className="text-red-500 font-pixel-alt text-xs">Lv{profile.level}</span>
+              )}
+              {walletLinked && walletAddress && (
+                <span
+                  title={`Synced to wallet ${walletAddress}`}
+                  className="text-green-400 font-pixel-alt text-xs bg-green-950/40 border border-green-700/50 rounded px-1.5 py-0.5"
+                >
+                  🔗 {walletAddress.slice(0, 4)}…{walletAddress.slice(-4)}
+                </span>
               )}
             </div>
 

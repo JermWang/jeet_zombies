@@ -338,16 +338,17 @@ export default function Player() {
     }
     setLastShootTime(now);
     try {
-      // Sounds for SINGLE SHOT weapons triggered PER SHOT
+      // Distinct weapon sound PER SHOT (incl. automatics) so audio stays in sync
+      // with the actual fire rate, not played once at the start of a burst.
       switch (currentWeapon) {
         case "pistol": playPistolSound(); break;
         case "shotgun": playShotgunSound(); break;
-        // case "smg": playSmgSound(); break; // MOVED TO MOUSEDOWN
-        // case "rifle": playRifleSound(); break; // MOVED TO MOUSEDOWN
-        default: break; // Removed warning for potentially handled auto weapons
+        case "smg": playSmgSound(); break;
+        case "rifle": playRifleSound(); break;
+        default: break;
       }
     } catch (error) {
-      console.warn("Failed to play single-shot shooting sound:", error);
+      console.warn("Failed to play shooting sound:", error);
     }
     triggerRecoil();
     triggerMuzzleFlash();
@@ -437,26 +438,11 @@ export default function Player() {
     };
 
     const handleGameMouseDown = (e: MouseEvent) => {
-      if (e.button === 0 && mouseLookEnabled && !isGameOver) { 
-        const initialShotSuccess = handleShoot(); // Initial shot
-        
+      if (e.button === 0 && mouseLookEnabled && !isGameOver) {
+        handleShoot(); // initial shot (handleShoot plays the per-shot sound itself)
         const weaponData = currentWeapon ? weapons[currentWeapon] : null;
         if (weaponData?.automatic) {
-          isFiringRef.current = true;
-          // Play the AUTOMATIC weapon sound ONCE on mousedown if the initial shot was successful
-          if (initialShotSuccess) { 
-              try {
-                  switch (currentWeapon) {
-                      case "smg": playSmgSound(); break;
-                      case "rifle": playRifleSound(); break;
-                      default: break; // Should already be handled by single-shot in handleShoot
-                  }
-              } catch (error) {
-                  console.warn("Failed to play automatic shooting sound on mousedown:", error);
-              }
-          }
-        } else if (!weaponData?.automatic && initialShotSuccess) {
-            // Single-shot sounds are already handled within handleShoot itself
+          isFiringRef.current = true; // useFrame keeps firing (each shot plays its own sound)
         }
       }
     };

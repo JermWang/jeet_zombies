@@ -1,10 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useWallet } from "@solana/wallet-adapter-react"
 
-// Anonymous-friendly identity: a stable player_id is generated client-side and
-// stored in localStorage. The server upserts a profile on first match submit.
-// Wallet login can later replace/merge this id without changing the data model.
+// Identity model:
+//  - Anonymous: a stable player_id (uuid) generated client-side in localStorage.
+//  - Wallet-linked: when a Solana wallet connects, the server resolves it to a
+//    canonical profile (same wallet = same profile across devices). The wallet
+//    profile becomes the ACTIVE id, so all progress (XP, matches, leaderboard,
+//    cosmetics, challenges) follows the wallet. Disconnecting reverts to anon.
 
 const ID_KEY = "jz_player_id"
 const NAME_KEY = "jz_username"
@@ -49,9 +53,15 @@ export interface ProfileSummary {
 }
 
 export function usePlayerProfile() {
+  const [anonId, setAnonId] = useState<string | null>(null)
+  // The ACTIVE id: wallet-linked profile id when connected, else the anon id.
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [username, setUsernameState] = useState<string>("anon")
   const [profile, setProfile] = useState<ProfileSummary | null>(null)
+  const [walletLinked, setWalletLinked] = useState(false)
+
+  const { publicKey, connected } = useWallet()
+  const walletAddress = connected && publicKey ? publicKey.toBase58() : null
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -65,9 +75,36 @@ export function usePlayerProfile() {
       name = randomName()
       localStorage.setItem(NAME_KEY, name)
     }
+    setAnonId(id)
     setPlayerId(id)
     setUsernameState(name)
   }, [])
+
+  // Link / unlink the wallet to a canonical profile.
+  useEffect(() => {
+    if (!anonId) return
+    if (!walletAddress) {
+      // disconnected -> fall back to anonymous identity
+      if (walletLinked) { setWalletLinked(false); setPlayerId(anonId) }
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/profile/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ walletAddress, playerId: anonId, username }),
+        })
+        const data = await res.json()
+        if (cancelled || !data?.playerId) return
+        setPlayerId(data.playerId)
+        setWalletLinked(true)
+        if (data.profile?.username) setUsernameState(data.profile.username)
+      } catch { /* wallet link best-effort */ }
+    })()
+    return () => { cancelled = true }
+  }, [walletAddress, anonId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = useCallback(async () => {
     if (!playerId) return
@@ -115,5 +152,5 @@ export function usePlayerProfile() {
     }
   }, [playerId, username, refresh])
 
-  return { playerId, username, setUsername, profile, refresh, submitMatch }
+  return { playerId, username, setUsername, profile, refresh, submitMatch, walletLinked, walletAddress }
 }
