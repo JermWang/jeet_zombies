@@ -190,9 +190,10 @@ export default function Player() {
   const lastDamageTime = useRef(0)
   const damageInterval = 1000
 
-  // Camera settings
-  const CAMERA_DISTANCE = 4.5
-  const CAMERA_HEIGHT = 4.0
+  // Camera settings — over-the-shoulder third person.
+  const CAMERA_DISTANCE = 5.2
+  const CAMERA_HEIGHT = 2.7        // lower = less top-down, more behind-the-shoulder
+  const CAMERA_SHOULDER = 1.5      // lateral offset so the player sits off to the side
   const CAMERA_SMOOTHING = 0.08
   const ROTATION_SMOOTHING = 0.95
   const MOUSE_SENSITIVITY = 0.002
@@ -416,8 +417,12 @@ export default function Player() {
     };
 
     const handlePointerLockChange = () => {
-      setMouseLookEnabled(document.pointerLockElement !== null);
+      const locked = document.pointerLockElement !== null;
+      setMouseLookEnabled(locked);
+      if (!locked && !isDemo) isFiringRef.current = false; // never keep auto-firing once unlocked
     };
+    // Safety: if the window loses focus mid-fire, stop the automatic weapon.
+    const handleBlur = () => { if (!isDemo) isFiringRef.current = false; };
 
     const handleMouseMove = (event: MouseEvent) => {
       if (!mouseLookEnabled || isGameOver) return;
@@ -469,6 +474,7 @@ export default function Player() {
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("contextmenu", handleContextMenu);
     document.addEventListener("pointerlockchange", handlePointerLockChange);
+    window.addEventListener("blur", handleBlur);
 
     return () => {
       document.removeEventListener("mousedown", handleDocumentMouseDown);
@@ -477,6 +483,7 @@ export default function Player() {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
+      window.removeEventListener("blur", handleBlur);
     };
   }, [isGameOver, setCameraAngle, mouseLookEnabled, handleShoot, currentWeapon, rapier, playSmgSound, playRifleSound]); // Added sound functions to deps
 
@@ -844,14 +851,22 @@ export default function Player() {
     if (visorRef.current) {
       visorRef.current.position.y = 0.05 + Math.sin(breathingAnim * Math.PI * 2) * 0.005
     }
+    // Camera "right" vector (perpendicular to view, on the ground plane) for the
+    // over-the-shoulder lateral offset.
+    const rightX = Math.cos(cameraRotation.current.y)
+    const rightZ = -Math.sin(cameraRotation.current.y)
     const cameraOffset = new THREE.Vector3(
-      -Math.sin(cameraRotation.current.y) * CAMERA_DISTANCE * Math.cos(cameraRotation.current.x),
+      -Math.sin(cameraRotation.current.y) * CAMERA_DISTANCE * Math.cos(cameraRotation.current.x) + rightX * CAMERA_SHOULDER,
       CAMERA_HEIGHT + CAMERA_DISTANCE * Math.sin(cameraRotation.current.x),
-      -Math.cos(cameraRotation.current.y) * CAMERA_DISTANCE * Math.cos(cameraRotation.current.x),
+      -Math.cos(cameraRotation.current.y) * CAMERA_DISTANCE * Math.cos(cameraRotation.current.x) + rightZ * CAMERA_SHOULDER,
     )
     targetCameraPosition.current = newPositionThree.clone().add(cameraOffset)
     camera.position.lerp(targetCameraPosition.current, CAMERA_POS_LERP_FACTOR);
-    const lookTarget = newPositionThree.clone().add(new THREE.Vector3(0, 2.3, 0))
+    // Look target shares the same lateral offset so the crosshair (screen center)
+    // points just past the player's shoulder, not through their body.
+    const lookTarget = newPositionThree.clone().add(
+      new THREE.Vector3(rightX * CAMERA_SHOULDER, 1.6, rightZ * CAMERA_SHOULDER)
+    )
     camera.lookAt(lookTarget)
 
     // --- Gun Logic START ---

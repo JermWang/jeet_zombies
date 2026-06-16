@@ -7,8 +7,11 @@ import * as THREE from 'three'; // Use * as THREE for THREE.Vector3
 import { GROUP_ENVIRONMENT } from '@/lib/physicsConstants';
 
 // Constants (can be moved to a shared constants file if used elsewhere)
-const SPAWN_RADIUS_MIN = 55;
-const SPAWN_RADIUS_MAX = 140;
+// The arena is bounded by walls at +/-50, so zombies MUST spawn inside that ring
+// or they're stuck outside and never reach the player. Spawn ~18-40 from center:
+// close enough to engage within a few seconds, far enough to not pop in your face.
+const SPAWN_RADIUS_MIN = 18;
+const SPAWN_RADIUS_MAX = 40;
 const SPAWN_CHECK_HEIGHT = 10;
 const SAFE_SPAWN_Y_OFFSET = 0.1;
 const MAX_SPAWN_ATTEMPTS = 10;
