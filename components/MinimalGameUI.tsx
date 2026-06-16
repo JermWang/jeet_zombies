@@ -179,7 +179,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
 
       {/* Conditionally render Debug Toggle Button */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="absolute top-4 right-4 pointer-events-auto z-10">
+        <div className="absolute top-16 right-4 pointer-events-auto z-10">
           <button
             onClick={toggleDebugMode}
             className="px-3 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
@@ -191,7 +191,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
 
       {/* Top stats bar — score / kills / survival time */}
       {gameStarted && !isGameOver && (
-        <div className="absolute top-4 left-4 flex flex-col gap-1 pointer-events-none">
+        <div className="absolute top-16 left-4 flex flex-col gap-1 pointer-events-none">
           <div className="bg-black/70 border-2 border-red-600 rounded px-3 py-1.5 shadow-lg">
             <span className="text-red-500 text-xs">SCORE</span>
             <div className="text-yellow-400 text-2xl leading-none tabular-nums">
@@ -272,7 +272,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
       )}
 
       {gameStarted && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-center">
+          <div className="absolute top-16 left-1/2 transform -translate-x-1/2 text-center">
               {waveMessage && (
                   <div className="text-3xl text-red-500 mb-2 animate-pulse">
                       {waveMessage}

@@ -2,6 +2,8 @@ import type React from "react"
 import "@/utils/r3f-patch"
 import "./globals.css"
 import { Press_Start_2P, VT323 } from "next/font/google"
+import SolanaProviders from "@/components/SolanaProviders"
+import NavBar from "@/components/NavBar"
 
 // Define fonts
 const pressStart = Press_Start_2P({
@@ -52,7 +54,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${pressStart.variable} ${vt323.variable} bg-black text-white antialiased`}>
-        {children}
+        <SolanaProviders>
+          <NavBar />
+          {children}
+        </SolanaProviders>
       </body>
     </html>
   )
