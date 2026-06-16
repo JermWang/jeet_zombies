@@ -28,7 +28,7 @@ import BossManager from "./BossManager"; // Import the new boss manager
 import WeaponPickup from "./WeaponPickup"; // Import the pickup component
 import WaveUI from "./WaveUI"; // Import the new UI component
 import SpawnPointFinder from "./SpawnPointFinder"; // ADDED
-import { OrbitControls, Sparkles } from "@react-three/drei"; // Import Sparkles
+import { OrbitControls, Sparkles, AdaptiveDpr, Preload, useGLTF } from "@react-three/drei"; // Import Sparkles + perf helpers
 import DriftingSparkles from './DriftingSparkles'; // Ensuring this is the active import
 import AmbientSoundManager from './AmbientSoundManager'; // ADD THIS LINE
 import PreviewCycleCamera from './PreviewCycleCamera'; // ADD THIS LINE
@@ -39,6 +39,12 @@ import PreviewZombies from './PreviewZombies'; // ADD THIS LINE
 // import type { AmmoPickupState } from "@/hooks/useGameStore"; // REMOVED
 import PickupManager from "./PickupManager"; // NEW: Import PickupManager
 import JuiceManager from "./JuiceManager"; // NEW: combat feedback overlay (hit markers, shake, kill feed)
+import LoadingOverlay from "./LoadingOverlay"; // NEW: real asset-loading progress bar
+
+// Phase 6: prefetch heavy GLB models so the first zombie/boss/prop spawn doesn't hitch.
+useGLTF.preload("/models/zombie_animated.glb");
+useGLTF.preload("/models/stylised_tree.glb");
+useGLTF.preload("/models/industrial_barrel.glb");
 
 // Helper component to drive the physics worker step AND the main world step
 const PhysicsStepper = () => {
@@ -131,7 +137,14 @@ export default function Game() {
       {/* 2D Screen Space Particles for Start Screen */}
       {/* {!gameStarted && <ScreenSpaceParticles />} // REMOVE THIS LINE */}
 
-      <Canvas shadows camera={{ position: [0, 5, 30], fov: 60 }}> {/* Adjust initial camera for better overview */}
+      {/* dpr clamp = big win on hi-DPI laptops; performance.min lets drei downscale under load */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 5, 30], fov: 60 }}
+        dpr={[1, 2]}
+        performance={{ min: 0.5 }}
+        gl={{ powerPreference: "high-performance", antialias: true }}
+      >
         {/* Re-enable WaveManager */}
         {gameStarted && <WaveManager />} 
         <Suspense fallback={<Loading />}>
@@ -189,8 +202,15 @@ export default function Game() {
               </EffectComposer>
             )} */}
           </Physics>
+          {/* Push all loaded assets to the GPU before first paint, and let drei
+              drop pixel ratio automatically when the frame budget is exceeded. */}
+          <Preload all />
         </Suspense>
+        <AdaptiveDpr pixelated />
       </Canvas>
+
+      {/* Real loading progress bar (replaces the old static "LOADING..." text) */}
+      <LoadingOverlay />
 
       {gameStarted && <WaveUI />}
       {gameStarted && <JuiceManager />}
