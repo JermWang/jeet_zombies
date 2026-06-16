@@ -162,6 +162,15 @@ export default function Player() {
   });
   const isFiringRef = useRef(false);
 
+  // --- Demo / attract mode (for recording promo footage). Gated behind ?demo=1
+  // so production play is completely unaffected. When on, the player auto-aims at
+  // the nearest zombie, auto-fires, and is invincible so a clip never game-overs.
+  const isDemo = useMemo(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1",
+    []
+  );
+  const demoStrafeRef = useRef(0);
+
   // Camera control
   const [mouseLookEnabled, setMouseLookEnabled] = useState(false)
   const cameraRotation = useRef({ x: 0, y: 0 })
@@ -581,6 +590,15 @@ export default function Player() {
     }
   }, [camera]); // Run when camera object is available
 
+  // Demo mode: enable look without pointer lock, and equip an automatic rifle.
+  useEffect(() => {
+    if (!isDemo) return;
+    setMouseLookEnabled(true);
+    addWeaponToStore("rifle");
+    setCurrentWeapon("rifle");
+    refuelAllWeapons(999);
+  }, [isDemo, addWeaponToStore, setCurrentWeapon, refuelAllWeapons]);
+
   // Use useFrame for game logic, physics, and camera updates
   useFrame((state, delta) => {
     if (isGameOver) {
@@ -593,6 +611,39 @@ export default function Player() {
         document.exitPointerLock();
       }
       return; // Skip all other player logic
+    }
+
+    // --- Demo / attract mode: auto-aim, auto-fire, invincible ---
+    if (isDemo) {
+      if (useGameStore.getState().health < 100) useGameStore.setState({ health: 100 });
+      const pBody = playerRef.current;
+      if (pBody) {
+        const p = pBody.translation();
+        const enemies = useGameStore.getState().enemies;
+        let best: typeof enemies[number] | null = null;
+        let bestD = Infinity;
+        for (const e of enemies) {
+          if (e.isDead) continue;
+          const dx = e.position.x - p.x;
+          const dz = e.position.z - p.z;
+          const d = dx * dx + dz * dz;
+          if (d < bestD) { bestD = d; best = e; }
+        }
+        if (best) {
+          const dx = best.position.x - p.x;
+          const dz = best.position.z - p.z;
+          const desiredYaw = Math.atan2(-dx, -dz);
+          let diff = desiredYaw - targetCameraRotation.current.y;
+          diff = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+          targetCameraRotation.current.y += diff * 0.06; // smooth cinematic pan
+          targetCameraRotation.current.x = 0.08;
+          setCameraAngle(targetCameraRotation.current.y);
+        }
+        handleShoot(); // muzzle flash + tracer + sound (respects fire rate)
+        // Damage assist so kills / hit-markers / kill-feed / combo fire reliably on camera.
+        demoStrafeRef.current += 1;
+        if (best && demoStrafeRef.current % 9 === 0) damageEnemy(best.id, 70);
+      }
     }
 
     // --- Automatic Firing in useFrame ---

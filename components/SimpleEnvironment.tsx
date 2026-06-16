@@ -5,7 +5,7 @@ import { THREE } from "@/utils/three-singleton"
 import { useLoader } from "@react-three/fiber"
 import { TextureLoader } from "three/src/loaders/TextureLoader.js"
 import { useEffect } from "react"
-import { Environment } from "@react-three/drei"
+import { Environment, Instances, Instance } from "@react-three/drei"
 import { CuboidCollider } from "@react-three/rapier"
 
 export default function SimpleEnvironment() {
@@ -78,16 +78,17 @@ export default function SimpleEnvironment() {
       {/* Dark Fog */}
       <fog attach="fog" args={['#1a0a0a', 15, 80]} /> {/* Dark reddish fog, starts at 15, full density at 80 */}
       
-      {/* Lighting */}
-      <Environment files="/hdri/NightEnvironmentHDRI008_1K-HDR.exr" background />
+      {/* Lighting — use the tonemapped JPG instead of the heavy 1K EXR
+          (EXR decode was blocking load + costing memory for no visible gain). */}
+      <Environment files="/hdri/NightEnvironmentHDRI008_1K-TONEMAPPED.jpg" background />
       <ambientLight color="#401010" intensity={0.25} /> 
       <directionalLight
         position={[-10, 15, -10]} 
         intensity={0.6} // Slightly reduced directional
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-far={50} 
+        shadow-mapSize-width={512}
+        shadow-mapSize-height={512}
+        shadow-camera-far={50}
         shadow-camera-left={-25}
         shadow-camera-right={25}
         shadow-camera-top={25}
@@ -136,27 +137,27 @@ export default function SimpleEnvironment() {
       {/* Back Wall (Z = -50) */}
       <RigidBody type="fixed" colliders="cuboid">
         {/* Left Section - Slightly shorter */}
-        <mesh position={[-30, 4.5, -50]} castShadow receiveShadow rotation={[0, 0, 0.02]}> 
+        <mesh position={[-30, 4.5, -50]} receiveShadow rotation={[0, 0, 0.02]}> 
           <boxGeometry args={[40, 9, 1]} /> 
           <primitive object={wallMaterial} attach="material" />
         </mesh>
         {/* Player Doorway Opening (Gap: x=-10 to x=10) */}
         {/* Right Section - Different height/width */}
-        <mesh position={[35, 4, -50]} castShadow receiveShadow rotation={[0, 0, -0.01]}>
+        <mesh position={[35, 4, -50]} receiveShadow rotation={[0, 0, -0.01]}>
           <boxGeometry args={[30, 8, 1]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
         {/* Crumbling Top Section (Jagged) */}
-        <mesh position={[-5, 9, -50]} castShadow receiveShadow rotation={[0, 0, -0.05]}>
+        <mesh position={[-5, 9, -50]} receiveShadow rotation={[0, 0, -0.05]}>
           <boxGeometry args={[8, 2, 1]} /> 
           <primitive object={wallMaterial} attach="material" />
         </mesh>
-         <mesh position={[5, 8.5, -50]} castShadow receiveShadow rotation={[0, 0, 0.08]}>
+         <mesh position={[5, 8.5, -50]} receiveShadow rotation={[0, 0, 0.08]}>
           <boxGeometry args={[10, 3, 1]} /> 
           <primitive object={wallMaterial} attach="material" />
         </mesh>
          {/* Small Crumbling Hole - Adjusted */}
-        <mesh position={[-42, 1.5, -50]} castShadow receiveShadow rotation={[0, 0, 0.1]}>
+        <mesh position={[-42, 1.5, -50]} receiveShadow rotation={[0, 0, 0.1]}>
           <boxGeometry args={[6, 3, 1]} /> 
           <primitive object={wallMaterial} attach="material" />
         </mesh>
@@ -165,17 +166,17 @@ export default function SimpleEnvironment() {
       {/* Front Wall (Z = 50) - Adjusted */}
        <RigidBody type="fixed" colliders="cuboid">
         {/* Left Section - Wider gap */}
-        <mesh position={[-28, 5, 50]} castShadow receiveShadow rotation={[0,0, 0.01]}>
+        <mesh position={[-28, 5, 50]} receiveShadow rotation={[0,0, 0.01]}>
           <boxGeometry args={[44, 10, 1]} /> 
           <primitive object={wallMaterial} attach="material" />
         </mesh>
         {/* Right Section - Smaller */}
-         <mesh position={[40, 4, 50]} castShadow receiveShadow rotation={[0,0,-0.03]}>
+         <mesh position={[40, 4, 50]} receiveShadow rotation={[0,0,-0.03]}>
           <boxGeometry args={[20, 8, 1]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
          {/* Lower Crumbling Piece */}
-         <mesh position={[10, 1.5, 50]} castShadow receiveShadow rotation={[0,0, 0.05]}> 
+         <mesh position={[10, 1.5, 50]} receiveShadow rotation={[0,0, 0.05]}> 
           <boxGeometry args={[8, 3, 1]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
@@ -183,16 +184,16 @@ export default function SimpleEnvironment() {
 
       {/* Left Wall (X = -50) - Adjusted */}
        <RigidBody type="fixed" colliders="cuboid">
-         <mesh position={[-50, 5, -30]} castShadow receiveShadow rotation={[0.02, 0, 0]}>
+         <mesh position={[-50, 5, -30]} receiveShadow rotation={[0.02, 0, 0]}>
           <boxGeometry args={[1, 10, 40]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
-         <mesh position={[-50, 4.5, 35]} castShadow receiveShadow rotation={[-0.01, 0, 0]}>
+         <mesh position={[-50, 4.5, 35]} receiveShadow rotation={[-0.01, 0, 0]}>
           <boxGeometry args={[1, 9, 30]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
         {/* Player Doorway - Wider and lower top */}
-        <mesh position={[-50, 7.5, 0]} castShadow receiveShadow rotation={[0.05,0,0]}> 
+        <mesh position={[-50, 7.5, 0]} receiveShadow rotation={[0.05,0,0]}> 
             <boxGeometry args={[1, 5, 22]} /> 
              <primitive object={wallMaterial} attach="material" />
          </mesh>
@@ -201,69 +202,54 @@ export default function SimpleEnvironment() {
        {/* Right Wall (X = 50) - Adjusted */}
        <RigidBody type="fixed" colliders="cuboid">
          {/* Lower Section */}
-         <mesh position={[50, 3, -20]} castShadow receiveShadow rotation={[-0.02, 0, 0]}>
+         <mesh position={[50, 3, -20]} receiveShadow rotation={[-0.02, 0, 0]}>
           <boxGeometry args={[1, 6, 60]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
          {/* Higher Section - Gap */}
-         <mesh position={[50, 7, 30]} castShadow receiveShadow rotation={[0.03, 0 ,0]}>
+         <mesh position={[50, 7, 30]} receiveShadow rotation={[0.03, 0 ,0]}>
           <boxGeometry args={[1, 6, 40]} />
           <primitive object={wallMaterial} attach="material" />
         </mesh>
          {/* Floating debris? */}
-          <mesh position={[50, 8.5, 5]} castShadow receiveShadow rotation={[0.1, 0.1, 0]}> 
+          <mesh position={[50, 8.5, 5]} receiveShadow rotation={[0.1, 0.1, 0]}> 
             <boxGeometry args={[1, 2, 3]} />
              <primitive object={wallMaterial} attach="material" />
         </mesh>
       </RigidBody>
 
-      {/* NEW: Impassable Perimeter Fence (Moved to outer edge) */}
-      {[[-149.5, 0, 0], [149.5, 0, 0], [0, 0, -149.5], [0, 0, 149.5]].map((pos, i) => (
-        <RigidBody 
-          key={`fence-${i}`} 
-          type="fixed" 
-          colliders={false}
-          position={[pos[0], 7.5, pos[2]]} // Positioned at ground, height centered
-        >
-          <CuboidCollider 
-            args={i < 2 ? [0.5, 7.5, 150] : [150, 7.5, 0.5]} // Full length for 300x300 area
-          />
-          <group>
-            {(() => {
-              const slats = [];
-              const fenceLength = 300;
-              const slatThickness = 0.2;
-              const gapSize = 0.8;
-              const slatPlusGap = slatThickness + gapSize; // Should be 1.0
-              const numberOfSlats = Math.floor(fenceLength / slatPlusGap);
-              const slatHeight = 15;
-              const fenceVisualThickness = 1;
-
-              for (let j = 0; j < numberOfSlats; j++) {
-                const slatPositionOffset = -fenceLength / 2 + slatThickness / 2 + j * slatPlusGap;
-                
-                slats.push(
-                  <mesh 
-                    key={`slat-${i}-${j}`} 
-                    castShadow 
-                    receiveShadow
-                    position={i < 2 ? [0, 0, slatPositionOffset] : [slatPositionOffset, 0, 0]}
-                  >
-                    <boxGeometry 
-                      args={i < 2 
-                        ? [fenceVisualThickness, slatHeight, slatThickness] 
-                        : [slatThickness, slatHeight, fenceVisualThickness] 
-                      }
-                    />
-                    <meshStandardMaterial color="#222222" emissive="#111111" flatShading={true} />
-                  </mesh>
-                );
-              }
-              return slats;
-            })()}
-          </group>
-        </RigidBody>
-      ))}
+      {/* Impassable Perimeter Fence — INSTANCED.
+          Was ~1200 individual shadow-casting meshes with a material each (a major
+          perf sink / renderer-crasher). Now one InstancedMesh per side (4 draw
+          calls total), shared material, no shadows (it's far-off perimeter). */}
+      {[[-149.5, 0, 0], [149.5, 0, 0], [0, 0, -149.5], [0, 0, 149.5]].map((pos, i) => {
+        const isZ = i < 2;
+        const fenceLength = 300;
+        const slatThickness = 0.2;
+        const gapSize = 0.8;
+        const slatPlusGap = slatThickness + gapSize;
+        const numberOfSlats = Math.floor(fenceLength / slatPlusGap);
+        const slatHeight = 15;
+        const fenceVisualThickness = 1;
+        const offsets: number[] = [];
+        for (let j = 0; j < numberOfSlats; j++) {
+          offsets.push(-fenceLength / 2 + slatThickness / 2 + j * slatPlusGap);
+        }
+        return (
+          <RigidBody key={`fence-${i}`} type="fixed" colliders={false} position={[pos[0], 7.5, pos[2]]}>
+            <CuboidCollider args={isZ ? [0.5, 7.5, 150] : [150, 7.5, 0.5]} />
+            <Instances limit={numberOfSlats} range={numberOfSlats} castShadow={false} receiveShadow={false}>
+              <boxGeometry
+                args={isZ ? [fenceVisualThickness, slatHeight, slatThickness] : [slatThickness, slatHeight, fenceVisualThickness]}
+              />
+              <meshStandardMaterial color="#222222" emissive="#111111" flatShading />
+              {offsets.map((off, j) => (
+                <Instance key={j} position={isZ ? [0, 0, off] : [off, 0, 0]} />
+              ))}
+            </Instances>
+          </RigidBody>
+        );
+      })}
     </>
   )
 }

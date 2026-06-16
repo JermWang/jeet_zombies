@@ -57,6 +57,16 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   // Load the player's equipped cosmetics once we have an id (drives skin + tracer in-game)
   useEffect(() => { if (playerId) loadCosmetics(playerId); }, [playerId, loadCosmetics]);
 
+  // Demo/attract mode (?demo=1): auto-start the match after the first user gesture
+  // so promo recording doesn't depend on clicking the START button.
+  const isDemo = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1";
+  useEffect(() => {
+    if (isDemo && hasInteracted && !gameStarted) {
+      const t = setTimeout(() => onStart(), 600);
+      return () => clearTimeout(t);
+    }
+  }, [isDemo, hasInteracted, gameStarted, onStart]);
+
   // Submit the finished run to the authoritative API exactly once per game-over.
   useEffect(() => {
     if (isGameOver && gameStarted && !submittedRef.current) {

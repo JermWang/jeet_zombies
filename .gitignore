@@ -25,3 +25,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# build/render artifacts + recorded footage
+/out
+public/gameplay.webm
+public/gameplay.mp4

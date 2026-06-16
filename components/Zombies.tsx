@@ -92,6 +92,7 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
     const timeBecameStuckRef = useRef<number | null>(null);
     const lastJumpTimeRef = useRef(0);
     const lastWallClimbTimeRef = useRef(0); // NEW: Ref for wall climb cooldown
+    const avoidFrameRef = useRef(0); // throttles obstacle-avoidance raycasts
 
     // Config memoization - Use type prop
     const config = useMemo(() => getEnemyConfig(type), [type]);
@@ -241,7 +242,13 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
         let steered = false;
         let attemptedWallClimb = false; // NEW: Flag to skip normal steering if climb happens
 
-        if (isMovingIntent) {
+        // Throttle the (expensive) obstacle-avoidance raycasts: run them every 3rd
+        // frame, staggered per-zombie by id so the cost is spread across frames.
+        // On the off-frames the zombie just steers directly toward the player.
+        avoidFrameRef.current++;
+        const shouldAvoid = (avoidFrameRef.current + id) % 3 === 0;
+
+        if (isMovingIntent && shouldAvoid) {
             const probeDistance = 1.5; 
             const whiskerAngle = Math.PI / 6; // 30 degrees for whiskers
             

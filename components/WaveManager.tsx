@@ -67,7 +67,23 @@ function proceduralWave(waveNumber: number): WaveConfig {
     };
 }
 
+// Demo/attract mode (?demo=1): dense, varied, continuous horde for promo footage.
+const IS_DEMO = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1";
+const DEMO_WAVE: WaveConfig = {
+    zombieCount: 42,
+    spawnDelay: 240,
+    types: [
+        { type: "zombie_standard_shirt", weight: 4 },
+        { type: "zombie_runner", weight: 3 },
+        { type: "zombie_brute", weight: 2 },
+        { type: "zombie_spitter", weight: 2 },
+        { type: "zombie_exploder", weight: 2 },
+        { type: "zombie_tank", weight: 1 },
+    ],
+};
+
 function getWaveConfig(waveNumber: number): WaveConfig {
+    if (IS_DEMO) return DEMO_WAVE;
     const idx = waveNumber - 1;
     return idx < WAVES.length ? WAVES[idx] : proceduralWave(waveNumber);
 }
@@ -164,12 +180,12 @@ const WaveManager = () => {
                         log("%c[WaveManager] Initial wave is Wave 10 (Boss Wave). Activating boss fight.", "color: magenta; font-weight: bold;");
                         setBossFightActiveRef.current(true);
                     }
-                    startWaveSpawningRef.current(waveIndex + 1, WAVES[waveIndex].zombieCount);
+                    startWaveSpawningRef.current(waveIndex + 1, getWaveConfig(waveIndex + 1).zombieCount);
                     zombiesSpawnedThisWave.current = 0;
                 } else {
                     log("%c[WaveManager Initial Start] No waves defined!", "color: orange");
                 }
-            }, INITIAL_DELAY);
+            }, IS_DEMO ? 1200 : INITIAL_DELAY);
         }
         return () => {
              if (initialDelayTimerRef.current) clearTimeout(initialDelayTimerRef.current);
@@ -294,7 +310,7 @@ const WaveManager = () => {
                     }
                     startWaveSpawning(nextWaveNumber, getWaveConfig(nextWaveNumber).zombieCount);
                     zombiesSpawnedThisWave.current = 0;
-            }, TOTAL_BETWEEN_WAVE_DELAY);
+            }, IS_DEMO ? 1200 : TOTAL_BETWEEN_WAVE_DELAY);
         }
         return () => {
             if (nextWaveStartTimerRef.current) clearTimeout(nextWaveStartTimerRef.current);
