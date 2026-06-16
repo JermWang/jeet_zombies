@@ -443,32 +443,32 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               {!hasInteracted && (
                 <p className="text-yellow-400 font-pixel-alt text-sm mb-3 animate-pulse">CLICK ANYWHERE TO ENABLE AUDIO</p>
               )}
-              <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch w-full max-w-[480px] mx-auto">
                 {/* TRAINING */}
-                <div className="flex-1 max-w-[230px] bg-neutral-900/70 border-2 border-neutral-600 rounded-lg p-4 flex flex-col">
-                  <div className="text-gray-200 text-lg mb-1">TRAINING</div>
-                  <div className="text-gray-500 font-pixel-alt text-[11px] mb-3 flex-1">
+                <div className="flex-1 min-w-0 bg-neutral-900/70 border-2 border-neutral-600 rounded-lg p-3 flex flex-col">
+                  <div className="text-gray-200 text-base mb-1">TRAINING</div>
+                  <div className="text-gray-500 font-pixel-alt text-[11px] mb-3 flex-1 leading-relaxed">
                     Free practice. No fee, no rewards. Sharpen up before you compete.
                   </div>
                   <Button
                     onClick={handleStartTraining}
                     disabled={!hasInteracted}
-                    className="bg-neutral-700 hover:bg-neutral-600 text-white font-pixel text-sm py-3 w-full"
+                    className="bg-neutral-700 hover:bg-neutral-600 text-white font-pixel text-xs py-3 px-2 w-full whitespace-normal leading-tight h-auto"
                   >
                     PLAY FREE
                   </Button>
                 </div>
 
                 {/* TOURNAMENT */}
-                <div className="flex-1 max-w-[230px] bg-gradient-to-b from-red-950/60 to-neutral-900/70 border-2 border-red-600 rounded-lg p-4 flex flex-col shadow-lg shadow-red-900/30">
-                  <div className="text-red-400 text-lg mb-1">TOURNAMENT</div>
-                  <div className="text-gray-400 font-pixel-alt text-[11px] mb-3 flex-1">
+                <div className="flex-1 min-w-0 bg-gradient-to-b from-red-950/60 to-neutral-900/70 border-2 border-red-600 rounded-lg p-3 flex flex-col shadow-lg shadow-red-900/30">
+                  <div className="text-red-400 text-base mb-1">TOURNAMENT</div>
+                  <div className="text-gray-400 font-pixel-alt text-[11px] mb-3 flex-1 leading-relaxed">
                     Ranked. Entry <span className="text-yellow-400">{ENTRY_FEE_DISPLAY} $SURVIVAL</span>. Climb the board, earn $SURVIVAL.
                   </div>
                   <Button
                     onClick={handleEnterTournament}
                     disabled={!hasInteracted || enteringTournament}
-                    className="bg-red-600 hover:bg-red-700 text-white font-pixel text-sm py-3 w-full"
+                    className="bg-red-600 hover:bg-red-700 text-white font-pixel text-xs py-3 px-2 w-full whitespace-normal leading-tight h-auto"
                   >
                     {enteringTournament ? "ENTERING…" : walletLinked ? `ENTER · ${ENTRY_FEE_DISPLAY}` : "CONNECT WALLET"}
                   </Button>
