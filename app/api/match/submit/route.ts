@@ -27,6 +27,7 @@ function sanitize(body: any): MatchResultInput | null {
     survivalSeconds: num(body.survivalSeconds),
     result: ["died", "extracted", "disconnected"].includes(body.result) ? body.result : "died",
     mode: typeof body.mode === "string" ? body.mode.slice(0, 32) : "survival_solo",
+    gameMode: body.gameMode === "tournament" ? "tournament" : "training",
     shotsFired: num(body.shotsFired),
   }
 }
@@ -62,8 +63,8 @@ export async function POST(req: NextRequest) {
       // 2. Match + match_player rows
       const match = (
         await c.query(
-          `insert into matches (mode, duration_seconds) values ($1, $2) returning id`,
-          [input!.mode, input!.survivalSeconds]
+          `insert into matches (mode, duration_seconds, game_mode) values ($1, $2, $3) returning id`,
+          [input!.mode, input!.survivalSeconds, input!.gameMode || "training"]
         )
       ).rows[0]
 

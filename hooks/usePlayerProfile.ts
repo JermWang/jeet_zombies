@@ -134,7 +134,7 @@ export function usePlayerProfile() {
 
   const submitMatch = useCallback(async (stats: {
     score: number; kills: number; wavesSurvived: number; maxCombo: number; survivalSeconds: number
-    result?: string
+    result?: string; gameMode?: "training" | "tournament"
   }): Promise<MatchSubmitResult | null> => {
     if (!playerId) return null
     try {
@@ -145,12 +145,39 @@ export function usePlayerProfile() {
       })
       if (!res.ok) return null
       const data = (await res.json()) as MatchSubmitResult
+      // For tournament runs, claim the $SURVIVAL reward (server validates + pays).
+      if (stats.gameMode === "tournament" && walletAddress && (data as any).matchId) {
+        try {
+          await fetch("/api/tournament/reward", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId, walletAddress, matchId: (data as any).matchId, score: stats.score }),
+          })
+        } catch { /* reward best-effort */ }
+      }
       refresh()
       return data
     } catch {
       return null
     }
-  }, [playerId, username, refresh])
+  }, [playerId, username, walletAddress, refresh])
 
-  return { playerId, username, setUsername, profile, refresh, submitMatch, walletLinked, walletAddress }
+  // Pay the entry fee + record a tournament entry. (Fee tx is dry-run-accepted
+  // server-side until REWARDS_LIVE; a real SPL transfer is built here when live.)
+  const enterTournament = useCallback(async (feeTxSig?: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!playerId || !walletAddress) return { ok: false, error: "wallet_required" }
+    try {
+      const res = await fetch("/api/tournament/enter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, walletAddress, feeTxSig: feeTxSig || "dry-run" }),
+      })
+      const data = await res.json()
+      return { ok: !!data.ok, error: data.error }
+    } catch {
+      return { ok: false, error: "network" }
+    }
+  }, [playerId, walletAddress])
+
+  return { playerId, username, setUsername, profile, refresh, submitMatch, enterTournament, walletLinked, walletAddress }
 }

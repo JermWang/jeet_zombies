@@ -13,6 +13,7 @@ export interface MatchResultInput {
   survivalSeconds: number
   result?: "died" | "extracted" | "disconnected"
   mode?: string
+  gameMode?: "training" | "tournament"
   // Optional client-reported telemetry used only for anti-cheat heuristics.
   shotsFired?: number
 }

@@ -44,7 +44,24 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   const [nowTick, setNowTick] = useState(0);
 
   // --- Account / progression ---
-  const { playerId, username, setUsername, profile, submitMatch, walletLinked, walletAddress } = usePlayerProfile();
+  const { playerId, username, setUsername, profile, submitMatch, enterTournament, walletLinked, walletAddress } = usePlayerProfile();
+  const [gameMode, setGameMode] = useState<"training" | "tournament">("training");
+  const [enteringTournament, setEnteringTournament] = useState(false);
+  const [tournamentError, setTournamentError] = useState<string | null>(null);
+  const ENTRY_FEE_DISPLAY = process.env.NEXT_PUBLIC_ENTRY_FEE_DISPLAY || "—";
+
+  const handleStartTraining = () => { setGameMode("training"); onStart(); };
+  const handleEnterTournament = async () => {
+    if (!walletLinked) { setTournamentError("Connect your wallet (top bar) to play ranked."); return; }
+    setEnteringTournament(true); setTournamentError(null);
+    const r = await enterTournament();
+    setEnteringTournament(false);
+    if (!r.ok) {
+      setTournamentError(r.error === "profile_required" ? "Create a profile first." : (r.error || "Entry failed"));
+      return;
+    }
+    setGameMode("tournament"); onStart();
+  };
   const loadCosmetics = useCosmetics((s) => s.load);
   const [matchResult, setMatchResult] = useState<MatchSubmitResult | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -75,7 +92,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
         ? Math.floor(((typeof performance !== "undefined" ? performance.now() : Date.now()) - gameStartTime) / 1000)
         : 0;
       submitMatch({
-        score, kills, wavesSurvived: currentWave, maxCombo, survivalSeconds: secs, result: "died",
+        score, kills, wavesSurvived: currentWave, maxCombo, survivalSeconds: secs, result: "died", gameMode,
       }).then(setMatchResult);
     }
     if (!isGameOver) {
@@ -421,22 +438,53 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
               )}
             </div>
 
-            {/* Primary actions */}
-            <div className="flex flex-col items-center gap-3 w-full">
-              <Button
-                onClick={onStart}
-                className="bg-red-600 hover:bg-red-700 text-white font-pixel px-10 py-5 text-2xl shadow-lg shadow-red-900/40"
-                disabled={!hasInteracted}
-              >
-                {hasInteracted ? "START GAME" : "CLICK TO ENABLE AUDIO"}
-              </Button>
+            {/* Mode select: Training (free) vs Tournament (paid, ranked) */}
+            <div className="w-full">
+              {!hasInteracted && (
+                <p className="text-yellow-400 font-pixel-alt text-sm mb-3 animate-pulse">CLICK ANYWHERE TO ENABLE AUDIO</p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch">
+                {/* TRAINING */}
+                <div className="flex-1 max-w-[230px] bg-neutral-900/70 border-2 border-neutral-600 rounded-lg p-4 flex flex-col">
+                  <div className="text-gray-200 text-lg mb-1">TRAINING</div>
+                  <div className="text-gray-500 font-pixel-alt text-[11px] mb-3 flex-1">
+                    Free practice. No fee, no rewards. Sharpen up before you compete.
+                  </div>
+                  <Button
+                    onClick={handleStartTraining}
+                    disabled={!hasInteracted}
+                    className="bg-neutral-700 hover:bg-neutral-600 text-white font-pixel text-sm py-3 w-full"
+                  >
+                    PLAY FREE
+                  </Button>
+                </div>
 
-              {/* Multiplayer — gated BETA. Disabled chip until the realtime server is live. */}
+                {/* TOURNAMENT */}
+                <div className="flex-1 max-w-[230px] bg-gradient-to-b from-red-950/60 to-neutral-900/70 border-2 border-red-600 rounded-lg p-4 flex flex-col shadow-lg shadow-red-900/30">
+                  <div className="text-red-400 text-lg mb-1">TOURNAMENT</div>
+                  <div className="text-gray-400 font-pixel-alt text-[11px] mb-3 flex-1">
+                    Ranked. Entry <span className="text-yellow-400">{ENTRY_FEE_DISPLAY} $SURVIVAL</span>. Climb the board, earn $SURVIVAL.
+                  </div>
+                  <Button
+                    onClick={handleEnterTournament}
+                    disabled={!hasInteracted || enteringTournament}
+                    className="bg-red-600 hover:bg-red-700 text-white font-pixel text-sm py-3 w-full"
+                  >
+                    {enteringTournament ? "ENTERING…" : walletLinked ? `ENTER · ${ENTRY_FEE_DISPLAY}` : "CONNECT WALLET"}
+                  </Button>
+                  <p className="text-[9px] text-red-700 font-pixel-alt mt-2 text-center">login + profile required</p>
+                </div>
+              </div>
+              {tournamentError && (
+                <p className="text-red-500 font-pixel-alt text-xs mt-2">{tournamentError}</p>
+              )}
+
+              {/* Multiplayer — gated BETA chip */}
               <button
-                onClick={() => MP_ENABLED && onStart()}
+                onClick={() => MP_ENABLED && handleStartTraining()}
                 disabled={!MP_ENABLED}
                 title={MP_ENABLED ? "Join a multiplayer match" : "Multiplayer is coming soon"}
-                className={`px-6 py-2 font-pixel text-sm rounded border ${
+                className={`mt-3 px-6 py-2 font-pixel text-sm rounded border ${
                   MP_ENABLED
                     ? "border-purple-500 text-purple-300 hover:bg-purple-900/40"
                     : "border-neutral-700 text-neutral-500 cursor-not-allowed"
