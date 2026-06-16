@@ -356,6 +356,16 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
                     <div className="h-full bg-yellow-500 transition-all duration-700"
                       style={{ width: `${Math.round(matchResult.levelPct * 100)}%` }} />
                   </div>
+                  {matchResult.reward && matchResult.reward.amount > 0 && (
+                    <div className="mt-2 bg-green-950/40 border border-green-600/50 rounded px-2 py-1 text-center">
+                      <span className="text-green-300 text-sm">
+                        💸 REWARD: {(matchResult.reward.amount / 1_000_000).toLocaleString()} $SURVIVAL
+                      </span>
+                      {matchResult.reward.dryRun && (
+                        <span className="text-gray-500 text-[9px] font-pixel-alt ml-1">(test)</span>
+                      )}
+                    </div>
+                  )}
                   {matchResult.flagged && (
                     <p className="text-[10px] text-red-600 mt-1 font-pixel-alt">⚠ run flagged — no rewards</p>
                   )}

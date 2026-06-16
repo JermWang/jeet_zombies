@@ -112,8 +112,9 @@ export async function POST(req: NextRequest) {
       }
 
       // 5. Leaderboards (daily / weekly / alltime) — keep best score per period.
-      //    Skipped entirely for flagged runs so cheaters never reach the board.
-      if (!clampXp) {
+      //    RANKED ONLY: only paid tournament runs reach the board (training is
+      //    practice). Flagged/cheated runs are skipped too.
+      if (!clampXp && input!.gameMode === "tournament") {
         const { daily, weekly } = periodKeys()
         const periods: [string, string][] = [["daily", daily], ["weekly", weekly], ["alltime", "all"]]
         for (const [period, key] of periods) {

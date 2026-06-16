@@ -37,6 +37,8 @@ export interface MatchSubmitResult {
   rank: number
   flagged: boolean
   completedChallenges: { challenge_key: string; description: string; reward_xp: number; reward_coins: number }[]
+  // $SURVIVAL payout for tournament runs (base units, 6 decimals); set by submitMatch.
+  reward?: { amount: number; dryRun: boolean; txSig?: string }
 }
 
 export interface ProfileSummary {
@@ -150,11 +152,15 @@ export function usePlayerProfile() {
       // For tournament runs, claim the $SURVIVAL reward (server validates + pays).
       if (stats.gameMode === "tournament" && walletAddress && (data as any).matchId) {
         try {
-          await fetch("/api/tournament/reward", {
+          const rr = await fetch("/api/tournament/reward", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ playerId, walletAddress, matchId: (data as any).matchId, score: stats.score }),
           })
+          const rd = await rr.json()
+          if (typeof rd?.amount === "number") {
+            data.reward = { amount: Number(rd.amount), dryRun: !!rd.dryRun, txSig: rd.txSig }
+          }
         } catch { /* reward best-effort */ }
       }
       refresh()
