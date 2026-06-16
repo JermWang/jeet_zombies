@@ -16,6 +16,7 @@ import { Trail } from "@react-three/drei"
 import weapons from "@/data/weapons"
 import { useSoundEffects } from "@/hooks/useSoundEffects";
 import useGameStore from "@/hooks/useGameStore";
+import useCosmetics from "@/hooks/useCosmetics";
 import { 
     GROUP_ENVIRONMENT, 
     GROUP_PLAYER, 
@@ -44,6 +45,9 @@ export function Bullet({ id, initialPosition, initialDirection, weaponId, damage
   const { playBulletImpactSound } = useSoundEffects();
   const damageEnemy = useGameStore((state) => state.damageEnemy);
   const rapier = useRapier();
+
+  // Equipped trail cosmetic tints the tracer + glow.
+  const trailColor = useCosmetics((s) => s.trailColor())
 
   const weaponData = weapons[weaponId]
   const speed = weaponData?.bulletSpeed || 30
@@ -105,51 +109,29 @@ export function Bullet({ id, initialPosition, initialDirection, weaponId, damage
   // --- END REMOVED --- 
 
   const handleCollision = (event: CollisionEnterPayload) => {
-    const collisionTime = performance.now();
-    console.log(`[${collisionTime.toFixed(2)}] Bullet ${id} handleCollision triggered.`);
-
-    // --- REVERTED: Clear lifetime timer moved back to the end ---
-    /*
-    if (despawnTimer.current) {
-        clearTimeout(despawnTimer.current);
-        despawnTimer.current = null; // Prevent potential double-clear
-    }
-    */
-    // --- END REVERT --- 
-
     playBulletImpactSound();
 
-    // --- SIMPLIFIED LOGGING TEST --- 
-    console.log(`Bullet ${id} collided with rigidBody:`, event.other.rigidBody);
-    console.log(`Bullet ${id} collided with collider:`, event.other.collider);
     const otherRb = event.other.rigidBody;
     const otherUserData = otherRb?.userData as any;
-    console.log(`Bullet ${id} collided with userData:`, otherUserData);
-    // --- END SIMPLIFIED LOGGING TEST --- 
 
-    if (otherUserData?.type === "enemy") { 
+    if (otherUserData?.type === "enemy") {
       const enemyId = otherUserData.id as number; // Get id from asserted userData
       if (typeof enemyId === 'number') {
-          console.log(`Bullet ${id} hitting enemy ID: ${enemyId}, applying damage: ${damage}`);
           damageEnemy(enemyId, damage); // Call the store action
-      } else {
-          console.warn("Bullet hit enemy but could not find enemy ID in userData.", otherUserData);
       }
     }
 
-    // --- Disable physics body immediately --- 
+    // --- Disable physics body immediately ---
     if (bulletRef.current) {
         bulletRef.current.setEnabled(false);
     }
-    // --- 
 
     // Clear lifetime timer
-    if (despawnTimer.current) { 
+    if (despawnTimer.current) {
       clearTimeout(despawnTimer.current); // Clear lifetime timer
       despawnTimer.current = null;
     }
-    console.log(`[${performance.now().toFixed(2)}] Bullet ${id} calling onDespawn.`);
-    onDespawn(id); 
+    onDespawn(id);
   }
 
   return (
@@ -172,11 +154,11 @@ export function Bullet({ id, initialPosition, initialDirection, weaponId, damage
       />
       <mesh castShadow={false} receiveShadow={false}>
         <sphereGeometry args={[0.05, 8, 8]} />
-        <meshStandardMaterial color="green" emissive="lime" emissiveIntensity={3} toneMapped={false} />
+        <meshStandardMaterial color={trailColor} emissive={trailColor} emissiveIntensity={3} toneMapped={false} />
         {/* Optional Trail */}
         <Trail
           width={0.05}
-          color={"limegreen"}
+          color={trailColor}
           length={5}
           decay={2}
           local={false}

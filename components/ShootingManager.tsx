@@ -35,18 +35,15 @@ export const ShootingManager = memo(function ShootingManager() {
     const handlePlayerShoot = (event: CustomEvent) => {
       // NEW: Prevent shooting if game is over
       if (isGameOver) {
-        console.log("[ShootingManager] Game is over. playerShoot event ignored.");
         return;
       }
 
       const { position, direction, weaponId, damage } = event.detail; // Get damage from event
-      
+
       if (!position || !direction || !weaponId || typeof damage === 'undefined') {
         console.error("Invalid playerShoot event detail:", event.detail);
         return;
       }
-
-      console.log("ShootingManager received playerShoot", { weaponId, damage });
 
       const newBullet: BulletState = {
         id: bulletIdCounter.current++,

@@ -3,25 +3,35 @@ import * as THREE from 'three';
 
 // Define the props, including refs for animation targeting and type
 interface ZombieModelProps {
-  type: string; // 'zombie_standard_shirt' | 'zombie_brute' | etc.
+  type: string; // 'zombie_standard_shirt' | 'zombie_brute' | archetypes
   leftArmRef?: React.Ref<THREE.Object3D>; // Use Object3D for groups/meshes
   rightArmRef?: React.Ref<THREE.Object3D>;
   leftLegRef?: React.Ref<THREE.Object3D>;
   rightLegRef?: React.Ref<THREE.Object3D>;
   isFlashing?: boolean; // Prop to control flash effect
+  tint?: string;        // NEW: archetype skin tint (Runner/Tank/Spitter/Exploder)
+  scale?: number;       // NEW: archetype visual scale
 }
 
 // Create materials (can be shared or made conditional if types differ drastically)
 const ZombieModel = forwardRef<THREE.Group, ZombieModelProps>(
-  ({ type, leftArmRef, rightArmRef, leftLegRef, rightLegRef, isFlashing }, ref) => {
-    // Shared materials
-    const greenSkinMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#5a8a58', roughness: 0.8 }), []);
+  ({ type, leftArmRef, rightArmRef, leftLegRef, rightLegRef, isFlashing, tint, scale }, ref) => {
+    // Shared materials — skin/shirt tint per archetype when `tint` is supplied.
+    const greenSkinMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: tint || '#5a8a58', roughness: 0.8 }), [tint]);
     const redEyeMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ff0000', emissive: '#ff0000', emissiveIntensity: 2 }), []);
     const brownPantsMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#6b4d3b', roughness: 0.7 }), []);
     const mouthMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#400000', roughness: 0.9 }), []);
-    // Standard specific
-    const redShirtMaterial = useMemo(() => new THREE.MeshStandardMaterial({ color: '#a13a3a', roughness: 0.7 }), []);
-    
+    // Standard specific — shirt is a darker shade of the tint if provided.
+    const redShirtMaterial = useMemo(() => {
+      const c = new THREE.Color(tint || '#a13a3a');
+      if (tint) c.multiplyScalar(0.7);
+      return new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
+    }, [tint]);
+
+    // Any non-brute type uses the rigged humanoid body so archetypes inherit the
+    // walk/arm animation. Brute keeps its bespoke bulkier build below.
+    const isHumanoid = type !== 'zombie_brute';
+
     // Note: Brute uses greenSkinMaterial for torso and brownPantsMaterial for shorts
 
     // Simple red flash material
@@ -36,9 +46,9 @@ const ZombieModel = forwardRef<THREE.Group, ZombieModelProps>(
     // Conditionally return JSX based on type
     return (
       <group ref={ref}>
-        {/* --- Standard Zombie --- */}
-        {type === 'zombie_standard_shirt' && (
-            <group>
+        {/* --- Standard / archetype humanoid (tinted + scaled) --- */}
+        {isHumanoid && (
+            <group scale={scale ?? 1}>
                 {/* Head */} 
                 <mesh castShadow position={[0, 0.7, 0]} material={isFlashing ? flashMaterial : greenSkinMaterial}> 
                     <boxGeometry args={[0.6, 0.6, 0.6]} />

@@ -15,7 +15,7 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 const INITIAL_DELAY = 3000;               // Delay before first wave starts (ms)
 // const WAVE_CLEARED_DISPLAY_TIME = 5000;   // How long "Wave Cleared" shows (ms) - Handled by WaveUI or BetweenWaves state duration
 // const COUNTDOWN_TIME = 3000;            // Duration of 3,2,1 countdown (ms) - Handled by WaveUI or a dedicated Countdown state if implemented
-const TOTAL_BETWEEN_WAVE_DELAY = 30000; // Total pause between waves (ms)
+const TOTAL_BETWEEN_WAVE_DELAY = 8000; // Total pause between waves (ms) — snappy loop
 
 // Wave Configuration
 interface WaveConfig {
@@ -25,19 +25,49 @@ interface WaveConfig {
 }
 
 const WAVES: WaveConfig[] = [
-    { zombieCount: 5, spawnDelay: 1500, types: [{ type: 'zombie_standard_shirt', weight: 1 }] },  
-    { zombieCount: 8, spawnDelay: 1200, types: [{ type: 'zombie_standard_shirt', weight: 1 }] },  
-    { zombieCount: 12, spawnDelay: 1000, types: [{ type: 'zombie_standard_shirt', weight: 5 }, { type: 'zombie_brute', weight: 1 }] }, 
-    { zombieCount: 15, spawnDelay: 900, types: [{ type: 'zombie_standard_shirt', weight: 3 }, { type: 'zombie_brute', weight: 2 } ] },
-    { zombieCount: 18, spawnDelay: 700, types: [{ type: 'zombie_standard_shirt', weight: 2 }, { type: 'zombie_brute', weight: 3 } ] },
-    { zombieCount: 25, spawnDelay: 500, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 1 } ] },
-    // NEW Placeholder Waves 7-9
-    { zombieCount: 30, spawnDelay: 450, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 2 } ] }, // More brutes
-    { zombieCount: 35, spawnDelay: 400, types: [{ type: 'zombie_standard_shirt', weight: 1 }, { type: 'zombie_brute', weight: 3 } ] }, // Even more brutes
-    { zombieCount: 40, spawnDelay: 350, types: [{ type: 'zombie_brute', weight: 1 } ] }, // All brutes, fast spawn
-    // NEW Wave 10: Boss Wave
-    { zombieCount: 1, spawnDelay: 1000, types: [{ type: 'zombie_boss', weight: 1 }] } 
+    // W1: gentle intro
+    { zombieCount: 5, spawnDelay: 1500, types: [{ type: 'zombie_standard_shirt', weight: 1 }] },
+    // W2: first runners appear
+    { zombieCount: 8, spawnDelay: 1200, types: [{ type: 'zombie_standard_shirt', weight: 4 }, { type: 'zombie_runner', weight: 1 }] },
+    // W3: runners ramp
+    { zombieCount: 12, spawnDelay: 1000, types: [{ type: 'zombie_standard_shirt', weight: 3 }, { type: 'zombie_runner', weight: 2 }] },
+    // W4: brutes + first exploders
+    { zombieCount: 15, spawnDelay: 900, types: [{ type: 'zombie_standard_shirt', weight: 3 }, { type: 'zombie_runner', weight: 2 }, { type: 'zombie_brute', weight: 1 }, { type: 'zombie_exploder', weight: 1 }] },
+    // W5: spitters join the fray
+    { zombieCount: 18, spawnDelay: 750, types: [{ type: 'zombie_standard_shirt', weight: 2 }, { type: 'zombie_runner', weight: 2 }, { type: 'zombie_spitter', weight: 2 }, { type: 'zombie_brute', weight: 1 }] },
+    // W6: chaotic mid-game mix
+    { zombieCount: 22, spawnDelay: 600, types: [{ type: 'zombie_runner', weight: 3 }, { type: 'zombie_spitter', weight: 2 }, { type: 'zombie_exploder', weight: 2 }, { type: 'zombie_brute', weight: 1 }] },
+    // W7: first tank
+    { zombieCount: 26, spawnDelay: 550, types: [{ type: 'zombie_standard_shirt', weight: 2 }, { type: 'zombie_runner', weight: 3 }, { type: 'zombie_spitter', weight: 2 }, { type: 'zombie_tank', weight: 1 }] },
+    // W8: heavy
+    { zombieCount: 30, spawnDelay: 450, types: [{ type: 'zombie_runner', weight: 3 }, { type: 'zombie_exploder', weight: 3 }, { type: 'zombie_spitter', weight: 2 }, { type: 'zombie_brute', weight: 2 }, { type: 'zombie_tank', weight: 1 }] },
+    // W9: gauntlet before the boss
+    { zombieCount: 36, spawnDelay: 380, types: [{ type: 'zombie_runner', weight: 3 }, { type: 'zombie_spitter', weight: 3 }, { type: 'zombie_exploder', weight: 3 }, { type: 'zombie_tank', weight: 2 }] },
+    // W10: BOSS
+    { zombieCount: 1, spawnDelay: 1000, types: [{ type: 'zombie_boss', weight: 1 }] }
 ];
+
+// Endless scaling past the authored waves: counts climb, spawns quicken, and the
+// elite mix gets nastier so there is always a next goal to chase.
+function proceduralWave(waveNumber: number): WaveConfig {
+    const over = waveNumber - WAVES.length; // waves beyond the authored set
+    return {
+        zombieCount: Math.min(48, 30 + over * 3),
+        spawnDelay: Math.max(250, 400 - over * 15),
+        types: [
+            { type: 'zombie_runner', weight: 4 },
+            { type: 'zombie_spitter', weight: 3 },
+            { type: 'zombie_exploder', weight: 3 },
+            { type: 'zombie_brute', weight: 2 },
+            { type: 'zombie_tank', weight: 1 + Math.floor(over / 2) },
+        ],
+    };
+}
+
+function getWaveConfig(waveNumber: number): WaveConfig {
+    const idx = waveNumber - 1;
+    return idx < WAVES.length ? WAVES[idx] : proceduralWave(waveNumber);
+}
 
 // Spawn parameters (findSafeSpawnPoint in store might use its own constants)
 // const SPAWN_RADIUS_MIN = 45;
@@ -152,13 +182,13 @@ const WaveManager = () => {
 
         if (waveStatus === 'Spawning') {
             const waveIndex = currentWave - 1;
-            if (waveIndex < 0 || waveIndex >= WAVES.length) {
+            if (waveIndex < 0) {
                 console.warn(`[WaveManager Spawning] Invalid waveIndex: ${waveIndex} for currentWave: ${currentWave}. Stopping spawn.`);
                 if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
                 spawnIntervalRef.current = null;
                 return;
             }
-            const config = WAVES[waveIndex];
+            const config = getWaveConfig(currentWave);
 
             console.log(`%c[WaveManager Spawning] State active for Wave ${currentWave}. Need ${config.zombieCount}, spawned ${zombiesSpawnedThisWave.current}. Starting interval.`, "color: blue");
 
@@ -256,18 +286,11 @@ const WaveManager = () => {
             console.log(`%c[WaveManager Between] State active. Setting timer for next wave (${nextWaveNumber}). Delay: ${TOTAL_BETWEEN_WAVE_DELAY}ms`, "color: purple");
 
             nextWaveStartTimerRef.current = setTimeout(() => {
-                 if (nextWaveIndex < WAVES.length) {
-                    console.log(`%c[WaveManager Between] Timer finished. Triggering Spawning for Wave ${nextWaveNumber}.`, "color: purple; font-weight: bold");
                     if (nextWaveNumber === 10) {
-                        console.log("%c[WaveManager] Next wave is Wave 10 (Boss Wave). Activating boss fight.", "color: magenta; font-weight: bold;");
                         setBossFightActiveRef.current(true);
                     }
-                    startWaveSpawning(nextWaveNumber, WAVES[nextWaveIndex].zombieCount);
+                    startWaveSpawning(nextWaveNumber, getWaveConfig(nextWaveNumber).zombieCount);
                     zombiesSpawnedThisWave.current = 0;
-                } else {
-                    console.log("%c[WaveManager Between] All waves completed or no next wave defined!", "color: orange; font-weight: bold");
-                    // Potentially transition to a game won state or similar
-                }
             }, TOTAL_BETWEEN_WAVE_DELAY);
         }
         return () => {

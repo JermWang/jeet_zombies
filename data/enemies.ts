@@ -19,6 +19,19 @@ export interface EnemyConfig {
     swingAmplitude?: number;
     bodyBobAmplitude?: number;
   };
+  // --- Phase 5: archetype identity + special behaviors ---
+  archetype?: 'walker' | 'runner' | 'tank' | 'spitter' | 'exploder' | 'boss';
+  tint?: string;            // skin tint so archetypes read at a glance
+  scale?: number;           // (already above) visual scale reused by ZombieModel
+  // Spitter: ranged attack
+  rangedRange?: number;     // max distance to spit from
+  rangedCooldown?: number;  // seconds between spits
+  rangedMinDamage?: number;
+  rangedMaxDamage?: number;
+  // Exploder: detonates on reaching the player
+  explosionRadius?: number;
+  explosionMinDamage?: number;
+  explosionMaxDamage?: number;
 }
 
 // Centralized configuration for different enemy types
@@ -66,6 +79,74 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     maxDamage: 75, // Placeholder NEW
     modelPath: "/models/zombie_animated.glb", 
   },
+  // ============ Phase 5 Archetypes ============
+  zombie_runner: { // Fast, fragile — punishes slow aim
+    health: 55,
+    scale: 0.9,
+    colliderType: 'capsule',
+    hitboxArgs: [0.35, 1.0],
+    hitboxOffsetY: 0.5,
+    visualYOffset: 0.6,
+    speed: 5.8,
+    attackRange: 1.4,
+    minDamage: 8,
+    maxDamage: 12,
+    archetype: 'runner',
+    tint: '#8a3a3a', // sickly red
+    attackDistanceThreshold: 1.6,
+  },
+  zombie_tank: { // Huge, slow, massive HP and hits
+    health: 650,
+    scale: 2.0,
+    colliderType: 'capsule',
+    hitboxArgs: [0.85, 3.0],
+    hitboxOffsetY: 1.5,
+    visualYOffset: 1.6,
+    speed: 1.5,
+    attackRange: 2.6,
+    minDamage: 40,
+    maxDamage: 60,
+    archetype: 'tank',
+    tint: '#3f5d3a', // dark mossy green
+    attackDistanceThreshold: 2.8,
+  },
+  zombie_spitter: { // Ranged — keeps pressure from afar
+    health: 90,
+    scale: 1.05,
+    colliderType: 'capsule',
+    hitboxArgs: [0.4, 1.2],
+    hitboxOffsetY: 0.6,
+    visualYOffset: 0.6,
+    speed: 2.2,
+    attackRange: 1.5,
+    minDamage: 8,
+    maxDamage: 8,
+    archetype: 'spitter',
+    tint: '#6b8f2a', // toxic yellow-green
+    rangedRange: 20,
+    rangedCooldown: 2.6,
+    rangedMinDamage: 7,
+    rangedMaxDamage: 13,
+  },
+  zombie_exploder: { // Rushes in and detonates — area denial
+    health: 70,
+    scale: 1.1,
+    colliderType: 'capsule',
+    hitboxArgs: [0.45, 1.2],
+    hitboxOffsetY: 0.6,
+    visualYOffset: 0.6,
+    speed: 3.4,
+    attackRange: 2.0,
+    minDamage: 0,
+    maxDamage: 0,
+    archetype: 'exploder',
+    tint: '#9a2c12', // angry orange-red
+    explosionRadius: 4.5,
+    explosionMinDamage: 35,
+    explosionMaxDamage: 55,
+    attackDistanceThreshold: 2.2,
+  },
+
   zombie_standard_bloody: { // Match standard shirt
     health: 100,
     scale: 1,

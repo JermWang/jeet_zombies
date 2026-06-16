@@ -8,6 +8,7 @@ import { THREE } from "@/utils/three-singleton"
 import useGameStore from "@/hooks/useGameStore"
 import { useSoundEffects } from "@/hooks/useSoundEffects"
 import useWeaponStore from "@/hooks/useWeaponStore"
+import useCosmetics from "@/hooks/useCosmetics"
 import weapons from "@/data/weapons"
 import { 
     GROUP_ENVIRONMENT, 
@@ -198,10 +199,17 @@ export default function Player() {
   const GRAVITY = -9.81
   const MOVEMENT_STOP_THRESHOLD = 200
 
-  // Character colors - Based on the reference image
-  const BODY_COLOR = "#cc0000"
-  const VISOR_COLOR = "#ff3a00"
-  const CHEST_LIGHT_COLOR = "#ff3a00"
+  // Character colors — equipped skin cosmetic overrides the defaults.
+  const cosmeticsOwned = useCosmetics((s) => s.owned)
+  const cosmeticsCatalog = useCosmetics((s) => s.catalog)
+  const skin = useMemo(
+    () => useCosmetics.getState().skinColors(),
+    // recompute whenever the player's equipped cosmetics change
+    [cosmeticsOwned, cosmeticsCatalog]
+  )
+  const BODY_COLOR = skin.body
+  const VISOR_COLOR = skin.visor
+  const CHEST_LIGHT_COLOR = skin.visor
   const WEAPON_COLOR = "#2a2a2a"
   const WEAPON_ACCENT = "#444444"
 
@@ -213,7 +221,7 @@ export default function Player() {
         roughness: 0.7,
         metalness: 0.3,
       }),
-    [],
+    [BODY_COLOR],
   )
 
   const visorMaterial = useMemo(
@@ -225,7 +233,7 @@ export default function Player() {
         emissive: VISOR_COLOR,
         emissiveIntensity: 2.0,
       }),
-    [],
+    [VISOR_COLOR],
   )
 
   const chestLightMaterial = useMemo(
@@ -237,7 +245,7 @@ export default function Player() {
         emissive: CHEST_LIGHT_COLOR,
         emissiveIntensity: 2.0,
       }),
-    [],
+    [CHEST_LIGHT_COLOR],
   )
 
   const weaponMaterial = useMemo(
@@ -475,29 +483,21 @@ export default function Player() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isGameOver) return;
 
-      // Log the state of availableWeapons when a key is pressed
-      console.log('[handleKeyDown] Key pressed:', e.key, 'Current availableWeapons:', availableWeapons);
-
       if (e.key >= "1" && e.key <= "9") { // Allow up to 9 weapon slots potentially
         const weaponSlotIndex = Number.parseInt(e.key) - 1; // 0-indexed slot
-        
+
         // Use the live availableWeapons array from the store
         if (weaponSlotIndex >= 0 && weaponSlotIndex < availableWeapons.length) {
           const targetWeapon = availableWeapons[weaponSlotIndex];
-          console.log(`[handleKeyDown] Slot ${e.key} corresponds to weapon: ${targetWeapon}`); // Log the target weapon
           if (targetWeapon && targetWeapon !== currentWeapon) { // Check if different to avoid unnecessary sound/animation
-            console.log(`[handleKeyDown] Switching to weapon: ${targetWeapon}`); // Log the switch attempt
             setCurrentWeapon(targetWeapon);
             setWeaponSwitchAnimation(1);
             playWeaponSwitchSound();
           }
-        } else {
-          console.log(`No weapon in slot ${e.key}`);
         }
       }
 
       if (e.key === "r" || e.key === "R") {
-        console.log("Reload key ('R') pressed");
         reload();
       }
 
@@ -545,7 +545,6 @@ export default function Player() {
   }, [])
 
   const handleCollisionEnter = useCallback((event: any) => {
-    console.log("Collision with:", event.other.rigidBodyObject, event.other.colliderObject?.userData);
     if (event.other.colliderObject?.userData?.type === 'zombie') {
       const now = Date.now()
       if (!isGameOver && health > 0) {

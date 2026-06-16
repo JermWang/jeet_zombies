@@ -88,6 +88,12 @@ export interface AmmoPickupState {
 interface GameState {
   health: number
   score: number
+  // --- NEW: Combat / progression feedback stats ---
+  kills: number
+  combo: number
+  maxCombo: number
+  lastKillTime: number // performance.now() ms of last kill, for combo window
+  gameStartTime: number // performance.now() ms when the round began
   isGameOver: boolean
   gameStarted: boolean
   wavesEnabled: boolean
@@ -152,16 +158,33 @@ interface GameState {
 const enemyHitResetTimeouts = new Map<number, NodeJS.Timeout>();
 const FLASH_DURATION_MS = 150; // Duration for the hit flash
 
+// --- NEW: Combo + feedback config ---
+const COMBO_WINDOW_MS = 3500; // Kills within this window keep the combo alive
+const BASE_KILL_SCORE = 10;
+
+// Lightweight, SSR-safe window event dispatcher used to drive the JuiceManager
+// overlay (hit markers, screen shake, kill feed, combo callouts) without coupling
+// the store to any rendering component.
+function emitGameEvent(name: string, detail?: any) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
 const useGameStore = createWithEqualityFn<GameState>(
   (set, get) => ({
   health: 100,
   score: 0,
+  kills: 0,
+  combo: 0,
+  maxCombo: 0,
+  lastKillTime: 0,
+  gameStartTime: 0,
   isGameOver: false,
   gameStarted: false,
   wavesEnabled: true,
   playerPosition: null,
   cameraAngle: 0,
-  isDebugMode: true,
+  isDebugMode: false,
   isPlayerHit: false, // NEW: Initial state for player hit
     enemies: [],
   enemyIdCounter: 0,
@@ -188,14 +211,18 @@ const useGameStore = createWithEqualityFn<GameState>(
         const newHealth = Math.max(0, state.health - amount);
         const gameOver = newHealth <= 0;
       // NEW: Play game over sounds if it just became game over
-      if (gameOver && !state.isGameOver) { 
+      if (gameOver && !state.isGameOver) {
         useSoundEffects.getState().playTransitionSound();
         useSoundEffects.getState().playOuttaControlSound();
       }
+      // NEW: feedback hooks — damage vignette + screen shake, and a death flag for the recap
+      emitGameEvent("jz:playerDamaged", { amount, health: newHealth, gameOver });
+      if (gameOver && !state.isGameOver) emitGameEvent("jz:gameOver");
       return {
         health: newHealth,
         isGameOver: gameOver, // Use the calculated gameOver state
-        isPlayerHit: true, 
+        isPlayerHit: true,
+        combo: 0, // Taking damage breaks the kill combo
         };
     }),
 
@@ -224,7 +251,12 @@ const useGameStore = createWithEqualityFn<GameState>(
       isGameOver: false,
       health: 100,
       score: 0,
-      enemies: initialEnemies, 
+      kills: 0,
+      combo: 0,
+      maxCombo: 0,
+      lastKillTime: 0,
+      gameStartTime: (typeof performance !== "undefined" ? performance.now() : Date.now()),
+      enemies: initialEnemies,
         enemyIdCounter: counter,
       currentWave: 0,
       zombiesRemainingInWave: 0,
@@ -251,6 +283,11 @@ const useGameStore = createWithEqualityFn<GameState>(
      set({
       health: 100,
       score: 0,
+      kills: 0,
+      combo: 0,
+      maxCombo: 0,
+      lastKillTime: 0,
+      gameStartTime: 0,
       isGameOver: false,       // Ensure game over is reset
       gameStarted: false,      // THIS IS THE KEY CHANGE: Return to main menu
       playerPosition: null,    // Reset player position (or to a menu default if any)
@@ -334,12 +371,13 @@ const useGameStore = createWithEqualityFn<GameState>(
     set((state) => {
       let targetEnemyHit = false;
       let enemyDied = false; // NEW: Flag to check if enemy died in this action
+      let deadEnemyType = 'zombie_standard_shirt';
       const newEnemies = state.enemies.map(enemy => {
         if (enemy.id === id && !enemy.isDead) {
           targetEnemyHit = true;
           const newHealth = Math.max(0, enemy.health - amount);
           const justDied = newHealth <= 0;
-          if (justDied) enemyDied = true; // NEW: Set flag if enemy died
+          if (justDied) { enemyDied = true; deadEnemyType = enemy.type; }
           return {
             ...enemy,
             health: newHealth,
@@ -350,20 +388,40 @@ const useGameStore = createWithEqualityFn<GameState>(
         return enemy;
       });
 
-      if (targetEnemyHit) {
-        const newlyDeactivatedCount = newEnemies.find(e => e.id === id)?.isDead && !state.enemies.find(e => e.id === id)?.isDead ? 1 : 0;
-        // NEW: Play death sound if enemyDied is true
-        if (enemyDied) {
-          useSoundEffects.getState().playZombieDeathSound(); 
-        }
-        return {
-          ...state,
-          enemies: newEnemies,
-          score: newEnemies.find(e => e.id === id)?.isDead ? state.score + 10 : state.score, // Add score if enemy died
-          zombiesRemainingInWave: state.zombiesRemainingInWave - newlyDeactivatedCount,
-        };
+      if (!targetEnemyHit) return state; // No enemy found or no change
+
+      // Always fire a hit marker for a connecting shot (juice + responsiveness)
+      emitGameEvent("jz:enemyHit", { id, amount, killed: enemyDied });
+
+      if (!enemyDied) {
+        return { ...state, enemies: newEnemies };
       }
-      return state; // No enemy found or no change
+
+      // --- Kill resolved: combo + scaled scoring ---
+      const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+      const comboAlive = now - state.lastKillTime <= COMBO_WINDOW_MS;
+      const newCombo = comboAlive ? state.combo + 1 : 1;
+      const comboMultiplier = 1 + Math.min(newCombo - 1, 10) * 0.25; // up to 3.5x
+      const gained = Math.round(BASE_KILL_SCORE * comboMultiplier);
+
+      useSoundEffects.getState().playZombieDeathSound();
+      emitGameEvent("jz:enemyKilled", {
+        id,
+        type: deadEnemyType,
+        combo: newCombo,
+        gained,
+      });
+
+      return {
+        ...state,
+        enemies: newEnemies,
+        score: state.score + gained,
+        kills: state.kills + 1,
+        combo: newCombo,
+        maxCombo: Math.max(state.maxCombo, newCombo),
+        lastKillTime: now,
+        zombiesRemainingInWave: Math.max(0, state.zombiesRemainingInWave - 1),
+      };
     });
 
     // Reset the isHit flag after a short delay for visual effect

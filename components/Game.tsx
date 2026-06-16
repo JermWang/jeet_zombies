@@ -38,6 +38,7 @@ import PreviewZombies from './PreviewZombies'; // ADD THIS LINE
 // import AmmoPickup from "./AmmoPickup"; // REMOVED: PickupManager will handle this
 // import type { AmmoPickupState } from "@/hooks/useGameStore"; // REMOVED
 import PickupManager from "./PickupManager"; // NEW: Import PickupManager
+import JuiceManager from "./JuiceManager"; // NEW: combat feedback overlay (hit markers, shake, kill feed)
 
 // Helper component to drive the physics worker step AND the main world step
 const PhysicsStepper = () => {
@@ -191,9 +192,10 @@ export default function Game() {
         </Suspense>
       </Canvas>
 
-      {gameStarted && <WaveUI />} 
+      {gameStarted && <WaveUI />}
+      {gameStarted && <JuiceManager />}
 
-      <MinimalGameUI 
+      <MinimalGameUI
         gameStarted={gameStarted} 
         onStart={startGame} 
         onReset={resetGame} 

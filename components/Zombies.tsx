@@ -96,34 +96,26 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
     // Config memoization - Use type prop
     const config = useMemo(() => getEnemyConfig(type), [type]);
 
-    // NEW: Get decreaseHealth from game store
+    // NEW: Get decreaseHealth + deactivateEnemy from game store
     const decreaseHealth = useGameStore((state) => state.decreaseHealth);
+    const deactivateEnemy = useGameStore((state) => state.deactivateEnemy);
     // NEW: Get playZombieBiteSound from sound effects hook
     const playZombieBiteSound = useSoundEffects((state) => state.playZombieBiteSound);
 
     // --- Effect to Create Rapier Body ---
     useEffect(() => {
-        console.log(`%c[ActiveZombie Physics Effect RUN] ID: ${id}, Type: ${type}. bodyRef.current is initially: ${bodyRef.current ? 'SET' : 'NULL'}. Rapier valid: ${!!(rapier && rapier.world)}`, "color: yellow");
-        
         if (!rapier || !rapier.world || id === null || !config) { // id can be 0 now
-            console.log(`%c[ActiveZombie Physics Effect] ID: ${id} - Conditions (rapier, id, config) not met. Aborting effect.`, "color: orange");
             return;
         }
         // This zombie_boss check is redundant if filtered out by parent, but good as a safeguard
-        if (type === 'zombie_boss') { 
-            console.log(`%c[ActiveZombie Physics Effect] ID: ${id} is zombie_boss type. Aborting effect.`, "color: orange");
+        if (type === 'zombie_boss') {
             return;
         }
 
         if (bodyRef.current) { // If body already exists for this instance
-            console.log(`%c[ActiveZombie Physics Effect] ID: ${id} - Body already exists (ref is SET). SKIPPING body creation.`, "color: green");
-            // This case should ideally not be hit frequently if deps are correct and stable.
-            // If rapier changed, we *should* be re-creating. So this log might indicate an issue if rapier is in deps and it still hits this.
-            // However, the cleanup function from the *previous* effect instance should have run.
-            return; 
+            return;
         }
-        
-        console.log(`%c[ActiveZombie Physics Effect] ID: ${id} - Creating NEW Rapier body.`, "color: cyan");
+
         const spawnPos = initialPosition;
 
         const rigidBodyDesc = rapier.rapier.RigidBodyDesc.dynamic()
@@ -149,17 +141,14 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
 
         return () => {
             const bodyToRemove = bodyRef.current;
-            console.log(`%c[ActiveZombie Physics CLEANUP START] ID: ${id}. bodyRef was ${bodyToRemove ? 'SET' : 'NULL'}.`, "color: red");
             if (bodyToRemove && rapier.world) {
                 try {
                     rapier.world.removeRigidBody(bodyToRemove);
-                    console.log(`%c[ActiveZombie Physics CLEANUP] Successfully removed RB for Enemy ID ${id}.`, "color: red");
                 } catch (error) {
                     console.error(`[ActiveZombie Physics CLEANUP] Error removing RB for Enemy ID ${id}:`, error);
                 }
             }
             bodyRef.current = null; // Explicitly nullify on cleanup
-            console.log(`%c[ActiveZombie Physics CLEANUP END] ID: ${id}. bodyRef is now NULL.`, "color: red");
         };
     }, [id, type, config]); // REVERTED: Removed `rapier` from deps, as per user's observation of instability
 
@@ -177,7 +166,6 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
         // --- End Debug Logs ---
 
         if (!groupRef.current || !playerPosition || !config || !world) { // Added world check here too
-            console.log(`[Zombie ${id} useFrame] EXIT: Missing refs, playerPos, config, or world.`);
             return;
         }
 
@@ -196,23 +184,51 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
         const zombieSpeed = config.speed || ZOMBIE_SPEED;
         const attackRange = config.attackRange || ATTACK_DISTANCE_THRESHOLD;
 
-        // 1. Calculate Base Desired Velocity (towards player)
-        if (distanceToPlayer > attackRange) {
+        const rollDamage = (min?: number, max?: number, fallback = DEFAULT_ATTACK_DAMAGE) => {
+            if (min !== undefined && max !== undefined) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+            return min ?? fallback;
+        };
+        const archetype = config.archetype;
+
+        // 1. Calculate Base Desired Velocity + archetype-specific attack behavior
+        if (archetype === 'spitter') {
+            // Ranged harasser: hold at range and spit, otherwise close the gap.
+            const rangedRange = config.rangedRange ?? 18;
+            if (distanceToPlayer <= rangedRange) {
+                desiredVelocity.set(0, 0, 0);
+                const cd = config.rangedCooldown ?? 2.6;
+                if (currentTime - lastAttackTimeRef.current > cd) {
+                    decreaseHealth(rollDamage(config.rangedMinDamage, config.rangedMaxDamage, 10));
+                    playZombieBiteSound();
+                    lastAttackTimeRef.current = currentTime;
+                }
+            } else {
+                const direction = new THREE.Vector3().subVectors(playerPosition, currentPositionTHREE).normalize();
+                desiredVelocity.set(direction.x, 0, direction.z).multiplyScalar(zombieSpeed);
+            }
+        } else if (distanceToPlayer > attackRange) {
             const direction = new THREE.Vector3().subVectors(playerPosition, currentPositionTHREE).normalize();
             desiredVelocity.set(direction.x, 0, direction.z).multiplyScalar(zombieSpeed);
-         } else {
-            // Attack Logic
-            desiredVelocity.set(0, 0, 0); 
+        } else if (archetype === 'exploder') {
+            // Detonate on contact: AoE the player if inside the blast, then self-destruct.
+            const radius = config.explosionRadius ?? 4;
+            if (distanceToPlayer <= radius) {
+                decreaseHealth(rollDamage(config.explosionMinDamage, config.explosionMaxDamage, 40));
+            }
+            playZombieBiteSound();
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("jz:explosion", { detail: { id } }));
+            }
+            deactivateEnemy(id);
+            return; // this zombie is gone for the rest of the frame
+        } else {
+            // Standard melee
+            desiredVelocity.set(0, 0, 0);
             if (currentTime - lastAttackTimeRef.current > DEFAULT_ATTACK_COOLDOWN) {
-                let actualDamage = DEFAULT_ATTACK_DAMAGE;
-                if (config.minDamage !== undefined && config.maxDamage !== undefined) {
-                    actualDamage = Math.floor(Math.random() * (config.maxDamage - config.minDamage + 1)) + config.minDamage;
-                } else if (config.minDamage !== undefined) { 
-                    actualDamage = config.minDamage;
-                }
-                // console.log(`%c[ActiveZombie ATTACK] ID: ${id} dealing ${actualDamage} damage...`, "color: red; font-weight: bold;"); // Keep console less noisy
-                decreaseHealth(actualDamage);
-                 playZombieBiteSound(); 
+                decreaseHealth(rollDamage(config.minDamage, config.maxDamage));
+                playZombieBiteSound();
                 lastAttackTimeRef.current = currentTime;
             }
         }
@@ -267,7 +283,6 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
                         // Check if normal is somewhat vertical (wall-like)
                         const hitNormal = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
                         if (Math.abs(hitNormal.y) < 0.7) { // Avoid attempting to "climb" floors or steep ceilings
-                            console.log(`%c[Zombie ${id}] Attempting WALL CLIMB! Player Y: ${playerPosition.y.toFixed(1)}, Zombie Y: ${currentPositionTHREE.y.toFixed(1)}`, "color: green");
                             const forwardImpulse = desiredDirTHREE.clone().multiplyScalar(zombieSpeed * CLIMB_JUMP_FORWARD_IMPULSE_SCALE);
                             rapierBodyApi.applyImpulse({ x: forwardImpulse.x, y: CLIMB_JUMP_UP_IMPULSE, z: forwardImpulse.z }, true);
                             lastWallClimbTimeRef.current = currentTime;
@@ -307,9 +322,6 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
                 steered = true;
             }
         }
-        // --- Debug Log: Final Desired Velocity & Applied Linvel ---
-        console.log(`[Zombie ${id} useFrame] ${steered ? 'STEERED' : 'Direct'}. Final Desired Vel: x=${desiredVelocity.x.toFixed(2)}, z=${desiredVelocity.z.toFixed(2)}. Applying Linvel: x=${desiredVelocity.x.toFixed(2)}, y=${currentLinvel.y.toFixed(2)}, z=${desiredVelocity.z.toFixed(2)}`);
-
         // 3. Apply Final Velocity
         if (!attemptedWallClimb) { // Don't apply regular velocity if a climb jump was made
             rapierBodyApi.setLinvel({ x: desiredVelocity.x, y: currentLinvel.y, z: desiredVelocity.z }, true);
@@ -325,7 +337,6 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
                     }
                     if (currentTime - (timeBecameStuckRef.current || 0) > STUCK_TIME_THRESHOLD) {
                         if (currentTime - lastJumpTimeRef.current > JUMP_COOLDOWN) {
-                            console.log(`%c[Zombie ${id}] Stuck! Attempting jump.`, "color: orange");
                             rapierBodyApi.applyImpulse({ x: 0, y: JUMP_IMPULSE_STRENGTH, z: 0 }, true);
                             lastJumpTimeRef.current = currentTime;
                             timeBecameStuckRef.current = null; // Reset stuck timer after jumping
@@ -341,8 +352,8 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
             timeBecameStuckRef.current = null;
         }
 
-        // --- Procedural Animation (If Applicable) ---
-        if (type === 'zombie_standard_shirt') {
+        // --- Procedural Animation (all humanoid archetypes share the rig) ---
+        if (type !== 'zombie_brute') {
             const walkSpeed = 3.0;
             const swingAmplitude = 0.2;
             // const bodyBobAmplitude = 0.05; // Body bobbing, can be added back if desired
@@ -395,6 +406,8 @@ const ActiveZombie = React.memo(function ActiveZombie({ id, type, initialPositio
                 leftLegRef={leftLegRef}
                 rightLegRef={rightLegRef}
                 isFlashing={isHit || false} // Use prop
+                tint={config.tint}
+                scale={config.scale}
             />
         </group>
     );
