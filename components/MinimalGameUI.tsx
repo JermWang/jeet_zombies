@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import useGameStore from "@/hooks/useGameStore"
 import TwitterIcon from "./ui/TwitterIcon"
 import TelegramIcon from "./ui/TelegramIcon"
+import PumpFunIcon from "./ui/PumpFunIcon"
 import { usePlayerProfile, type MatchSubmitResult } from "@/hooks/usePlayerProfile"
 import useCosmetics from "@/hooks/useCosmetics"
 import { MP_ENABLED } from "@/lib/featureFlags"
@@ -86,8 +87,9 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
     : 0;
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  // Define the contract address as a constant
-  const CONTRACT_ADDRESS = "bXzXzvk94KC6V6U8wgLQ2DfH3owQMXyqGPA3czfDGFM";
+  // Token mint comes from env — empty until the pump.fun relaunch, in which case
+  // the contract-address row is hidden.
+  const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_MINT || "";
 
   useEffect(() => {
     if (isPlayerHit) {
@@ -449,32 +451,46 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
           </div>
 
           <div className="flex flex-col items-center space-y-2 mt-6 pointer-events-auto px-4 w-full">
-            <div className="flex space-x-4">
-              <a 
-                href="https://x.com/JeetZombies" 
-                target="_blank" 
-                rel="noopener noreferrer" 
+            <div className="flex items-center space-x-4">
+              <a
+                href="https://x.com/JeetZombies"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300"
                 aria-label="Twitter"
               >
                 <TwitterIcon className="w-6 h-6" />
               </a>
-            </div>
-            <div className="flex items-center justify-center mt-2"> 
-              <p className="text-white font-pixel-alt text-base">Exclusively on GoFundMeme</p> 
-            </div>
-            <div className="flex items-center space-x-2 mt-1"> 
-              {/* Use the constant for display */}
-              <span className="text-gray-400 font-mono text-xs break-all">
-                {CONTRACT_ADDRESS}
-              </span>
-              <Button
-                onClick={handleCopy}
-                className="bg-red-600 hover:bg-red-700 text-white font-pixel-alt text-sm px-3 py-1 flex-shrink-0"
+              <a
+                href={CONTRACT_ADDRESS ? `https://pump.fun/coin/${CONTRACT_ADDRESS}` : "https://pump.fun"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:opacity-80 transition-opacity"
+                aria-label="pump.fun"
               >
-                {copied ? "Copied!" : "Copy"}
-              </Button>
+                <PumpFunIcon className="w-6 h-6" />
+              </a>
             </div>
+            <div className="flex items-center justify-center gap-1.5 mt-2">
+              <PumpFunIcon className="w-4 h-4" />
+              <p className="text-white font-pixel-alt text-base">Live on pump.fun</p>
+            </div>
+
+            {CONTRACT_ADDRESS ? (
+              <div className="flex items-center space-x-2 mt-1">
+                <span className="text-gray-400 font-mono text-xs break-all">
+                  {CONTRACT_ADDRESS}
+                </span>
+                <Button
+                  onClick={handleCopy}
+                  className="bg-red-600 hover:bg-red-700 text-white font-pixel-alt text-sm px-3 py-1 flex-shrink-0"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-gray-500 font-pixel-alt text-xs mt-1">CA dropping soon — stay tuned 👀</p>
+            )}
           </div>
         </div>
       )}

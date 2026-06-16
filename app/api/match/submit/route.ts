@@ -99,9 +99,7 @@ export async function POST(req: NextRequest) {
         )
       ).rows[0]
 
-      // keep denormalized level in sync
-      const newLevel = levelForTotalXp(Number(profile.total_xp))
-      await c.query(`update player_profiles set level = $2 where player_id = $1`, [input!.playerId, newLevel])
+      // (level is recomputed + persisted once at the end, after challenge XP)
 
       // 4. Coin ledger
       if (coinsEarned > 0) {
