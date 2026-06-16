@@ -19,28 +19,28 @@ const vt323 = VT323({
 })
 
 export const metadata = {
-  title: "JEET ZOMBIES",
+  title: "JEET SURVIVAL",
   description: "HOLY SHIT! thats alotta jeets!",
-  metadataBase: new URL('https://jeetzombies.xyz'),
+  metadataBase: new URL('https://jeetsurvival.fun'),
   openGraph: {
-    title: "JEET ZOMBIES",
+    title: "JEET SURVIVAL",
     description: "HOLY SHIT! thats alotta jeets!",
-    url: 'https://jeetzombies.xyz',
+    url: 'https://jeetsurvival.fun',
     images: [
       {
-        url: '/jeetzombies.jpg', // Relative to metadataBase
+        url: '/jeetsurvival.jpg', // Relative to metadataBase
         width: 1200, // Optional: Specify image width
         height: 630, // Optional: Specify image height
-        alt: 'JEET ZOMBIES Social Share Image',
+        alt: 'JEET SURVIVAL Social Share Image',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: "JEET ZOMBIES",
+    title: "JEET SURVIVAL",
     description: "HOLY SHIT! thats alotta jeets!",
-    images: ['/jeetzombies.jpg'], // Relative to metadataBase, or absolute URL
+    images: ['/jeetsurvival.jpg'], // Relative to metadataBase, or absolute URL
   },
 }
 

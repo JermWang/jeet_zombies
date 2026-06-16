@@ -1,4 +1,4 @@
-# Deploying Jeet Zombies (production)
+# Deploying Jeet Survival (production)
 
 The launch product is **single-player** with full progression, leaderboards,
 cosmetics, and daily challenges — all backed by Supabase. Multiplayer ships as a

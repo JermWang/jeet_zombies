@@ -18,7 +18,7 @@ declare global {
 function createPool(): Pool {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
-    throw new Error("DATABASE_URL is not set — cannot reach the JeetZombies database.")
+    throw new Error("DATABASE_URL is not set — cannot reach the Jeet Survival database.")
   }
   // On Vercel each serverless instance is isolated, so keep the per-instance pool
   // tiny to avoid exhausting the Supabase pooler under concurrency.

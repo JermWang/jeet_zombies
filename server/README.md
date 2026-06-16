@@ -1,4 +1,4 @@
-# Jeet Zombies — Realtime Match Server
+# Jeet Survival — Realtime Match Server
 
 Authoritative WebSocket server for multiplayer survival (Phase 3 scaffold).
 

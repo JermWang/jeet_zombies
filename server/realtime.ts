@@ -1,5 +1,5 @@
 /**
- * Jeet Zombies — authoritative realtime match server (Phase 3 scaffold).
+ * Jeet Survival — authoritative realtime match server (Phase 3 scaffold).
  *
  * Run:  npm run server        (one-shot)
  *       npm run dev:server     (watch mode)
@@ -256,7 +256,7 @@ async function endRoom(room: Room) {
 
 // ---- Connection handling ----
 const wss = new WebSocketServer({ port: PORT })
-console.log(`🧟 Jeet Zombies realtime server listening on ws://localhost:${PORT} (tick ${TICK_RATE}Hz)`)
+console.log(`🧟 Jeet Survival realtime server listening on ws://localhost:${PORT} (tick ${TICK_RATE}Hz)`)
 
 wss.on("connection", (ws) => {
   let player: ServerPlayer | null = null

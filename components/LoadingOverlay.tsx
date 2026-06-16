@@ -22,7 +22,7 @@ export default function LoadingOverlay() {
 
   return (
     <div className="fixed inset-0 z-[1002] flex flex-col items-center justify-center bg-black pointer-events-none font-pixel">
-      <h1 className="text-4xl text-red-600 mb-2 animate-pulse">JEET ZOMBIES</h1>
+      <h1 className="text-4xl text-red-600 mb-2 animate-pulse">JEET SURVIVAL</h1>
       <p className="text-red-400 font-pixel-alt text-xs mb-6 uppercase tracking-widest">Loading the horde...</p>
 
       <div className="w-64 h-3 bg-neutral-900 border-2 border-red-800 rounded-sm overflow-hidden">

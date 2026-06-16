@@ -24,7 +24,7 @@ export default function SimpleUI({ gameStarted, isGameOver, score, health, start
       {!gameStarted && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-auto">
           <div className="text-center p-8 bg-black border-2 border-red-600 rounded-lg">
-            <h1 className="text-2xl text-red-500 mb-4">JEET ZOMBIES</h1>
+            <h1 className="text-2xl text-red-500 mb-4">JEET SURVIVAL</h1>
             <p className="text-red-300 mb-6">SURVIVE THE ZOMBIE APOCALYPSE</p>
             <button onClick={startGame} className="px-6 py-3 bg-red-700 text-white rounded-lg hover:bg-red-600">
               START GAME

@@ -129,15 +129,15 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
 
   const buildShareText = () => {
     const r = matchResult;
-    return `I just survived ${formatTime(survivalSeconds)} in JEET ZOMBIES 🧟\n` +
+    return `I just survived ${formatTime(survivalSeconds)} in JEET SURVIVAL 🧟\n` +
       `Score ${score.toLocaleString()} · ${kills} kills · Wave ${currentWave} · x${maxCombo} combo` +
       (r ? ` · Rank #${r.rank}` : "") +
-      `\nThink you can do better, anon? 👇 $JEETZOMBIES`;
+      `\nThink you can do better, anon? 👇 $JEETSURVIVAL`;
   };
 
   const handleShare = () => {
     const text = buildShareText();
-    const url = "https://x.com/JeetZombies";
+    const url = "https://x.com/JeetSurvival";
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       "_blank", "noopener,noreferrer"
@@ -145,7 +145,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
   };
 
   const handleShareCopy = () => {
-    navigator.clipboard.writeText(`${buildShareText()}\nhttps://x.com/JeetZombies`).then(() => {
+    navigator.clipboard.writeText(`${buildShareText()}\nhttps://x.com/JeetSurvival`).then(() => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
     }).catch(() => {});
@@ -373,7 +373,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-auto">
           <div className="flex flex-col items-center gap-7 mb-8">
             <div className="relative inline-block">
-              <h1 className="text-5xl font-pixel text-red-600 uppercase tracking-wide drop-shadow-[0_3px_0_rgba(0,0,0,0.85)]">JEET ZOMBIES</h1>
+              <h1 className="text-5xl font-pixel text-red-600 uppercase tracking-wide drop-shadow-[0_3px_0_rgba(0,0,0,0.85)]">JEET SURVIVAL</h1>
               <span
                 className="absolute -top-2 -right-9 text-xs font-pixel text-yellow-400 transform"
               >
@@ -456,7 +456,7 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
           <div className="flex flex-col items-center space-y-3 pt-6 border-t border-neutral-800/70 pointer-events-auto px-4 w-full max-w-sm mx-auto">
             <div className="flex items-center space-x-4">
               <a
-                href="https://x.com/JeetZombies"
+                href="https://x.com/JeetSurvival"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300"
