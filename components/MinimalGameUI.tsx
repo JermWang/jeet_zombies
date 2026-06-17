@@ -114,9 +114,8 @@ export function MinimalGameUI({ gameStarted, onStart, onReset, hasInteracted }: 
     : 0;
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-  // Token mint comes from env — empty until the pump.fun relaunch, in which case
-  // the contract-address row is hidden.
-  const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_MINT || "";
+  // Contract address (hardcoded so it always shows, env-independent).
+  const CONTRACT_ADDRESS = "25zCPGEWXUbhRDyZejRw1G3JSNRNXvQ3FF2fDJpgpump";
 
   useEffect(() => {
     if (isPlayerHit) {

@@ -11,7 +11,8 @@ const WalletMultiButton = dynamic(
   { ssr: false, loading: () => <div className="h-9 w-[150px] rounded bg-red-700/40 animate-pulse" /> }
 )
 
-const TOKEN_MINT = process.env.NEXT_PUBLIC_TOKEN_MINT || ""
+// Contract address (hardcoded so it always shows, env-independent).
+const TOKEN_MINT = "25zCPGEWXUbhRDyZejRw1G3JSNRNXvQ3FF2fDJpgpump"
 
 function shorten(addr: string) {
   return addr.length > 12 ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : addr
